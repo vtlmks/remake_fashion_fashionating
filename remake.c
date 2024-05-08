@@ -13,9 +13,9 @@
 
 #include "fashion_sample.h"
 #include "data/fashionating.h"
-#include "data/ivory_towers.h"
+#include "data/ivorytowers.h"
 #include "data/parallax_ii.h"
-#include "data/world_of_the_dj.h"
+#include "data/the_world_of_the_dj.h"
 
 // TODO(peter): Need to re-rip the sample used for the intro-sequence!
 
@@ -39,9 +39,9 @@ void setup(struct loader_shared_state *state) {
 
 	pt2play_initPlayer(48000);
 	pt2play_PlaySong(&remake->p1_fashionating, fashionating_data, CIA_TEMPO_MODE, 48000);
-	pt2play_PlaySong(&remake->p2_world_of_the_dj, world_of_the_dj_data, CIA_TEMPO_MODE, 48000);
+	pt2play_PlaySong(&remake->p2_world_of_the_dj, the_world_of_the_dj_data, CIA_TEMPO_MODE, 48000);
 	pt2play_PlaySong(&remake->p3_parallax_2, parallax_ii_data, CIA_TEMPO_MODE, 48000);
-	pt2play_PlaySong(&remake->p4_ivory_tower, ivory_towers_data, CIA_TEMPO_MODE, 48000);
+	pt2play_PlaySong(&remake->p4_ivory_tower, ivorytowers_data, CIA_TEMPO_MODE, 48000);
 }
 
 void cleanup(struct loader_shared_state *state) {

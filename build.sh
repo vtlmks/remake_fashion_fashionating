@@ -3,10 +3,30 @@
 OUT_FILE="fashion-fashionating"
 
 pushd data > /dev/null
-bin2h -i "../music/fashionating.mod" -o fashionating
-bin2h -i "../music/ivorytowers.mod" -o ivory_towers
-bin2h -i "../music/parallax ii.mod" -o parallax_ii
-bin2h -i "../music/the world of the dj.mod" -o world_of_the_dj
+
+# Function to extract filename without extension and clean it
+get_clean_filename() {
+    local fullpath="$1"
+    local filename=$(basename -- "$fullpath")
+    filename="${filename%.*}" # Remove extension
+    filename="${filename//./_}" # Replace dots
+    filename="${filename//-/_}" # Replace dashes
+    filename="${filename// /_}" # Replace spaces
+    echo "$filename"
+}
+
+# Music files
+for mod in ../music/*.mod; do
+    base_name=$(get_clean_filename "$mod")
+    bin2h -i "$mod" -o "$base_name"
+done
+
+# BMP files
+for bmp in ../graphics/*.bmp; do
+    base_name=$(get_clean_filename "$bmp")
+    bmp2h -i "$bmp" -o "$base_name"
+done
+
 popd > /dev/null
 
 # Build Linux version
