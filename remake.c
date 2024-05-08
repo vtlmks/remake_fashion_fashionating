@@ -11,7 +11,7 @@
 #define MKS_RESAMPLER_IMPLEMENTATION
 #include "../utility/resampler.h"
 
-#include "fashion_sample.h"
+#include "data/fashion_sample.h"
 #include "data/fashionating.h"
 #include "data/ivorytowers.h"
 #include "data/parallax_ii.h"

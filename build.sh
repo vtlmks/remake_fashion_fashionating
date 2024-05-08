@@ -27,6 +27,8 @@ for bmp in ../graphics/*.bmp; do
     bmp2h -i "$bmp" -o "$base_name"
 done
 
+bin2h -i ../music/fashion-sample.raw -o fashion-sample
+
 popd > /dev/null
 
 # Build Linux version
