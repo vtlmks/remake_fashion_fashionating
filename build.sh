@@ -21,10 +21,10 @@ for mod in ../music/*.mod; do
     bin2h -i "$mod" -o "$base_name"
 done
 
-# BMP files
-for bmp in ../graphics/*.bmp; do
-    base_name=$(get_clean_filename "$bmp")
-    bmp2h -i "$bmp" -o "$base_name"
+# PNG files
+for png in ../graphics/*.png; do
+    base_name=$(get_clean_filename "$png")
+    png2h -i "$png" -o "$base_name"
 done
 
 bin2h -i ../music/fashion-sample.raw -o fashion-sample

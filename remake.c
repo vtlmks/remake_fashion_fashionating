@@ -4,19 +4,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/*
+ * Framework
+ */
 #include <loader.h>
 #include <remake.h>
 
-#include "protracker2.c"
-#define MKS_RESAMPLER_IMPLEMENTATION
-#include "../utility/resampler.h"
-
+/*
+ * Audio data
+ */
 #include "data/fashion_sample.h"
 #include "data/fashionating.h"
 #include "data/ivorytowers.h"
 #include "data/parallax_ii.h"
 #include "data/the_world_of_the_dj.h"
 
+/*
+ * Graphics
+ */
 #include "data/loader_logo.h"
 #include "data/p1_c64_loading_run.h"
 #include "data/p1_c64_loading_run_original.h"
@@ -37,6 +42,25 @@
 #include "data/p3_small_scroll_font.h"
 #include "data/p4_greetings_text.h"
 
+#define ARRAYSIZE(x) (sizeof(x) / sizeof(*x))
+
+
+/*
+ * Remake stuff
+ */
+#include "loader.c"
+#include "part1.c"
+#include "part2.c"
+#include "part3.c"
+#include "part4.c"
+
+/*
+ * local use
+ */
+#include "protracker2.c"
+#define MKS_RESAMPLER_IMPLEMENTATION
+#include "../utility/resampler.h"
+
 struct sample_state {
 	int16_t *data;
 	uint32_t size;
@@ -50,15 +74,14 @@ struct remake  {
 	struct pt_state p3_parallax_2;
 	struct pt_state p4_ivory_tower;
 	struct sample_state sample;
-	uint32_t demo_part;									// Which demopart we are in
+	uint32_t demo_state;									// Which demopart we are in
 };
 
 void setup(struct loader_shared_state *state) {
 	state->remake_userdata = (struct remake *)calloc(1, sizeof(struct remake));
 	struct remake *remake = (struct remake *)state->remake_userdata;
-	remake->sample.data = resample_audio(fashion_sample_data, FASHION_SAMPLE_DATA_SIZE, 267, &remake->sample.size);
-// static int16_t *resample_audio(const int8_t *input_audio, size_t input_size, uint32_t period, uint32_t *outsize) {
 
+	remake->sample.data = resample_audio(fashion_sample_data, FASHION_SAMPLE_DATA_SIZE, 267, &remake->sample.size);
 	pt2play_initPlayer(48000);
 	pt2play_PlaySong(&remake->p1_fashionating, fashionating_data, CIA_TEMPO_MODE, 48000);
 	pt2play_PlaySong(&remake->p2_world_of_the_dj, the_world_of_the_dj_data, CIA_TEMPO_MODE, 48000);
@@ -74,14 +97,10 @@ void cleanup(struct loader_shared_state *state) {
 	state->remake_userdata = 0;
 }
 
-void key_callback(struct loader_shared_state *state, int key) {
-	struct remake *remake = (struct remake *)state->remake_userdata;
-}
-
 void audio_callback(struct loader_shared_state *state, int16_t *audio_buffer, size_t frames) {
 	struct remake *remake = (struct remake *)state->remake_userdata;
 
-	switch(remake->demo_part) {
+	switch(remake->demo_state) {
 
 		// TODO(peter): make this a statemachine for part 1, as the sample shouldn't begin playing until a certain time, and then the module should start at yet another later time.
 		case 1: {
@@ -120,6 +139,11 @@ void audio_callback(struct loader_shared_state *state, int16_t *audio_buffer, si
 	}
 }
 
+
+void key_callback(struct loader_shared_state *state, int key) {
+	struct remake *remake = (struct remake *)state->remake_userdata;
+}
+
 int32_t mainloop_callback(struct loader_shared_state *state) {
 	struct remake *remake = (struct remake *)state->remake_userdata;
 	uint32_t *buffer = state->buffer;
@@ -127,35 +151,36 @@ int32_t mainloop_callback(struct loader_shared_state *state) {
 	memset(buffer, 0, state->buffer_width*state->buffer_height*sizeof(uint32_t));
 
 #if 0
-	switch(remake->demo_part) {
+	switch(remake->demo_state) {
 		case 1: { part_1_render(state); } break;
 		case 3: { part_1_render(state); } break;
 		case 5: { part_1_render(state); } break;
 		case 7: { part_1_render(state); } break;
 		default: {
 			if(loader(state)) {
-				remake->demo_part++;
+				remake->demo_state++;
 			}
 		} break;
 
 	}
 #endif
 
-	switch(remake->demo_part) {
+	switch(remake->demo_state) {
 		case 1:
 		case 3:
 		case 5:
 		case 7: {
 			if(state->mouse_button_state[REMAKE_MOUSE_BUTTON_LEFT]) {
-				remake->demo_part++;
-				if(remake->demo_part == 8) {
-					remake->demo_part = 0;
+				remake->demo_state++;
+				if(remake->demo_state == 8) {
+					remake->demo_state = 0;
 				}
-				printf("%d\n", remake->demo_part);
+				printf("%d\n", remake->demo_state);
 			}
 		} break;
 		default: {
-			remake->demo_part++;	// TODO(peter): REMOVE
+			// remake->demo_state++;	// TODO(peter): REMOVE
+			loader(state);
 		}
 	}
 
