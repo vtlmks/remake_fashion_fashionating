@@ -37,7 +37,7 @@ uint32_t loader(struct loader_shared_state *state) {
 	static uint32_t roller = 0;
 	++counter;
 
-	if((counter % 42) == 0) roller += 2;
+	if((counter % 21) == 0) roller += 2;
 	if((counter % 3) == 0) roller += 1;
 
 	switch(roller) {
@@ -57,6 +57,7 @@ uint32_t loader(struct loader_shared_state *state) {
 	uint32_t x = (state->buffer_width - LOADER_LOGO_WIDTH) >> 1;
 	uint32_t y = (state->buffer_height - LOADER_LOGO_HEIGHT) >> 1;
 	fast_blit_with_palette(state, loader_logo_data, LOADER_LOGO_WIDTH, LOADER_LOGO_HEIGHT, loader_logo_red_palette, x, y);
+
 
 	if(loader_timer) {
 		--loader_timer;
