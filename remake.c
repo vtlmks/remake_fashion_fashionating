@@ -1,3 +1,6 @@
+
+// IMPORTANT(peter): Make sure the first color has alpha set to 0x00 and all other black colors has alpha set to 0xff, else havok..
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -42,8 +45,92 @@
 #include "data/p3_small_scroll_font.h"
 #include "data/p4_greetings_text.h"
 
-#define ARRAYSIZE(x) (sizeof(x) / sizeof(*x))
+#ifndef arraysize
+#define arraysize(x) (sizeof(x) / sizeof(*x))
+#endif
 
+#ifndef min
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#endif
+
+#ifndef max
+#define max(a,b) ((a) > (b) ? (a) : (b))
+#endif
+
+uint32_t *pre_render_to_32bit(const uint8_t *image_8bit, uint32_t width, uint32_t height, const uint32_t *palette) {
+	uint32_t *image_32bit = malloc(width * height * sizeof(uint32_t));
+	if(image_32bit) {
+		for(uint32_t i = 0; i < width * height; ++i) {
+			image_32bit[i] = palette[image_8bit[i]];
+		}
+	}
+	return image_32bit;
+}
+
+void fast_blit(struct loader_shared_state *state, const uint32_t *image,  uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset) {
+	uint32_t *dest = state->buffer + y_offset * state->buffer_width + x_offset;
+
+	for (uint32_t y = 0; y < image_height; ++y) {
+		memcpy(dest, image, image_width * sizeof(uint32_t));
+		dest += state->buffer_width;
+		image += image_width;
+	}
+}
+
+void fast_blit_transparency(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset) {
+	uint32_t *dest = state->buffer + y_offset * state->buffer_width + x_offset;
+
+	for(uint32_t y = 0; y < image_height; ++y) {
+		for(uint32_t x = 0; x < image_width; ++x) {
+			uint32_t color = image_data[x];
+			if(color) {
+				dest[x] = color;
+			}
+		}
+		dest += state->buffer_width;
+		image_data += image_width;
+	}
+}
+
+void fast_blit_with_palette(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset) {
+	uint32_t *dest = state->buffer + y_offset * state->buffer_width + x_offset;
+
+	for (uint32_t y = 0; y < image_height; ++y) {
+		for (uint32_t x = 0; x < image_width; ++x) {
+			uint32_t color_id = image_data[x];
+			if(color_id) {
+				dest[x] = palette[color_id];
+			}
+		}
+		dest += state->buffer_width;
+		image_data += image_width;
+	}
+}
+
+
+void render_and_clip_image(struct loader_shared_state *state, uint8_t *image_data, int image_width, int image_height, uint32_t *palette, int xOffset, int yOffset) {
+	// Clipping calculations to ensure we don't write outside the buffer
+	int startX = xOffset < 0 ? -xOffset : 0;
+	int startY = yOffset < 0 ? -yOffset : 0;
+	int endX = xOffset + image_width > state->buffer_width ? state->buffer_width - xOffset : image_width;
+	int endY = yOffset + image_height > state->buffer_height ? state->buffer_height - yOffset : image_height;
+
+	// Calculate the starting point in the buffer
+	uint32_t *row = state->buffer + max(0, yOffset) * state->buffer_width + max(0, xOffset);
+	uint8_t *image = image_data + startY * image_width + startX;
+
+	// Iterate through the image data and render only the visible parts
+	for(int y = startY; y < endY; ++y) {
+		for(int x = startX; x < endX; ++x) {
+			uint8_t color_id = image[x];
+			if(color_id) { // Assuming 0 is transparent or should not be rendered
+				row[x] = palette[color_id];
+			}
+		}
+		row += state->buffer_width;
+		image += image_width;
+	}
+}
 
 /*
  * Remake stuff
