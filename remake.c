@@ -257,6 +257,8 @@ int32_t mainloop_callback(struct loader_shared_state *state) {
 		case 3:
 		case 5:
 		case 7: {
+			part_4_render(state);
+
 			if(state->mouse_button_state[REMAKE_MOUSE_BUTTON_LEFT]) {
 				remake->demo_state++;
 				if(remake->demo_state == 8) {
@@ -266,8 +268,9 @@ int32_t mainloop_callback(struct loader_shared_state *state) {
 			}
 		} break;
 		default: {
-			// remake->demo_state++;	// TODO(peter): REMOVE
-			loader(state);
+			if(loader(state)) {
+				remake->demo_state++;
+			}
 		}
 	}
 
