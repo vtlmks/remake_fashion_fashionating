@@ -53,7 +53,9 @@ static uint32_t fsn_bottom_logo_colors[32] = {	// Green
 __attribute__((aligned(64)))
 static uint8_t p4_scroll_buffer[P4_UPSCROLL_WIDTH * P4_UPSCROLL_HEIGHT];
 
+__attribute__((aligned(64)))
 static uint32_t greetings_heights[] = { 8, 57, 61, 61, 61, 17, 17, 28 };
+__attribute__((aligned(64)))
 static uint8_t *greetings_offsets[] = {
 	p4_greetings_text_data,
 	p4_greetings_text_data + P4_GREETINGS_TEXT_WIDTH * 18,
@@ -67,11 +69,11 @@ static uint8_t *greetings_offsets[] = {
 
 // Function to handle palette cycling
 static void p4_color_cycle(uint32_t *colors) {
-    uint32_t temp = colors[16];
-    for (uint8_t i = 16; i < 31; ++i) {
-        colors[i] = colors[i + 1];
-    }
-    colors[31] = temp;
+	uint32_t temp = colors[16];
+	for(uint8_t i = 16; i < 31; ++i) {
+		colors[i] = colors[i + 1];
+	}
+	colors[31] = temp;
 }
 
 static int32_t part_4_render(struct loader_shared_state *state) {
@@ -95,7 +97,6 @@ static int32_t part_4_render(struct loader_shared_state *state) {
 	// Reset scrolling and prepare for new text
 	if(counter == 512 || counter == 1536 || counter == 2560 || counter == 3584 || counter == 4608 || counter == 5632 || counter == 6656) {
 		p4_scroll = 256;  // Start scroll reset to prepare for next text
-		printf("counter: %u\n", counter);
 	}
 
 	// Update text at specific offsets after scroll reset

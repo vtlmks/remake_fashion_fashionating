@@ -124,6 +124,7 @@ void audio_callback(struct loader_shared_state *state, int16_t *audio_buffer, si
 				int16_t *dst = audio_buffer;
 				for(uint32_t i = 0; i < frames; ++i) {
 					int16_t sample = remake->sample.data[remake->sample.position];
+					sample = (int16_t)(sample * 0.707);
 					*dst++ = sample;
 					*dst++ = sample;
 					remake->sample.position++;
