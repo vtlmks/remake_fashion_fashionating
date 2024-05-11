@@ -181,7 +181,9 @@ int32_t mainloop_callback(struct loader_shared_state *state) {
 
 	switch(remake->demo_state) {
 		case 1:
-		case 3:
+		case 3: {
+			part_2_render(state);
+		} break;
 		case 5:
 		case 7: {
 			part_4_render(state);
@@ -195,9 +197,13 @@ int32_t mainloop_callback(struct loader_shared_state *state) {
 			}
 		} break;
 		default: {
+#if 0
 			if(loader(state)) {
 				remake->demo_state++;
 			}
+#else
+			remake->demo_state++;
+#endif
 		}
 	}
 
