@@ -42,9 +42,9 @@ static uint32_t fsn_bottom_logo_colors[32] = {	// Green
 
 // Macro definitions for dimensions and offsets
 #define P4_LOGO_X_OFFSET                            55
-#define P4_TOP_LOGO_Y_OFFSET                        (22 - 10)
-#define P4_BOTTOM_LOGO_Y_OFFSET                     (231 - 10)
-#define P4_UPSCROLL_Y_POS                           (69 - 10)
+#define P4_TOP_LOGO_Y_OFFSET                        (22 - 11)
+#define P4_BOTTOM_LOGO_Y_OFFSET                     (231 - 11)
+#define P4_UPSCROLL_Y_POS                           (69 - 11)
 #define P4_UPSCROLL_WIDTH                           352
 #define P4_UPSCROLL_HEIGHT                          220
 #define P4_UPSCROLL_VISIBLE_HEIGHT                  157
@@ -143,47 +143,3 @@ static int32_t part_4_render(struct loader_shared_state *state) {
 	}
 	return 0; // Indicate continuous running
 }
-
-
-
-
-// void expand_and_mask_sse(uint8_t *input, uint32_t *output, int num_elements) {
-// 	for (int i = 0; i < num_elements; i += 4) {
-// 		// Load 4 bytes from memory (we handle 4 bytes at a time for 4 masks)
-// 		__m128i data = _mm_cvtsi32_si128(*(int*)(input + i));
-
-// 		// Expand bytes to 32-bit integers (unpack them)
-// 		data = _mm_unpacklo_epi8(data, _mm_setzero_si128());
-// 		data = _mm_unpacklo_epi16(data, _mm_setzero_si128());
-
-// 		// Compare each 32-bit integer with 0 to create a mask
-// 		__m128i mask = _mm_cmpgt_epi32(data, _mm_setzero_si128());
-
-// 		__m128i result = _mm_and_si128(mask, values_to_write);
-
-// 		__m128i result = _mm_or_si128(_mm_and_si128(mask, values_to_write), _mm_andnot_si128(mask, _mm_loadu_si128((__m128i*)(output + i))));
-
-// 		// Store result to output
-// 		_mm_storeu_si128((__m128i*)(output + i), result);
-// 	}
-// }
-
-
-// #include <immintrin.h>  // AVX2 for wider operations
-
-// void expand_and_mask_avx(uint8_t *input, uint32_t *output, int num_elements) {
-//     for (int i = 0; i < num_elements; i += 8) {
-//         // Load 8 bytes from memory (we handle 8 bytes at a time for 8 masks)
-//         __m256i data = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)(input + i)));
-
-//         // Compare each 32-bit integer with 0 to create a mask
-//         __m256i mask = _mm256_cmpgt_epi32(data, _mm256_setzero_si256());
-
-//         // Example operation: write a value based on the mask
-//         __m256i values_to_write = _mm256_set1_epi32(0xFFFFFFFF); // example value to write
-//         __m256i result = _mm256_or_si256(_mm256_and_si256(mask, values_to_write), _mm256_andnot_si256(mask, _mm256_loadu_si256((__m256i*)(output + i))));
-
-//         // Store result to output
-//         _mm256_storeu_si256((__m256i*)(output + i), result);
-//     }
-// }
