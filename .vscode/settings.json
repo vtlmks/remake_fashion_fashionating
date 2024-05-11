@@ -1,5 +1,6 @@
 {
 	"files.associations": {
-		"fashion_sample.h": "c"
+		"fashion_sample.h": "c",
+		"random": "c"
 	}
 }
