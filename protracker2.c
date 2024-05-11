@@ -118,7 +118,7 @@ uint32_t pt2play_GetMixerTicks(void); // returns the amount of milliseconds of m
 */
 
 // == USER ADJUSTABLE SETTINGS ==
-#define STEREO_SEP (20)		/* --> Stereo separation in percent - 0 = mono, 100 = hard pan (like Amiga) */
+#define STEREO_SEP (25)		/* --> Stereo separation in percent - 0 = mono, 100 = hard pan (like Amiga) */
 #define USE_HIGHPASS			/* --> ~5.2Hz HP filter present in all Amigas */
 #define USE_LOWPASS			/* --> ~4.42kHz LP filter present in all Amigas (except A1200) - comment out for sharper sound */
 #define USE_BLEP				/* --> Reduces some aliasing in the sound (closer to real Amiga) - comment out for a speed-up */

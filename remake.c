@@ -156,6 +156,18 @@ void audio_callback(struct loader_shared_state *state, int16_t *audio_buffer, si
 
 void key_callback(struct loader_shared_state *state, int key) {
 	struct remake *remake = (struct remake *)state->remake_userdata;
+	if(state->keyboard_state[REMAKE_KEY_1]) {
+		remake->demo_state = 1;
+	}
+	if(state->keyboard_state[REMAKE_KEY_2]) {
+		remake->demo_state = 3;
+	}
+	if(state->keyboard_state[REMAKE_KEY_3]) {
+		remake->demo_state = 5;
+	}
+	if(state->keyboard_state[REMAKE_KEY_4]) {
+		remake->demo_state = 7;
+	}
 }
 
 int32_t mainloop_callback(struct loader_shared_state *state) {
