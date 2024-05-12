@@ -55,13 +55,13 @@ void render_and_clip_image_initialize(struct loader_shared_state *state, uint8_t
 
 // Forward declarations for all functions
 static uint32_t *pre_render_to_32bit_default(const uint8_t *image_8bit, uint32_t width, uint32_t height, const uint32_t *palette);
-
+//
 static void fast_blit_default(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
-
+//
 static void fast_blit_transparency_default(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
-
+//
 static void render_and_clip_image_default(struct loader_shared_state *state, uint8_t *image_data, int image_width, int image_height, uint32_t *palette, int xOffset, int yOffset);
-
+//
 static void fast_blit_with_palette_default(struct loader_shared_state *state,  const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
 static void fast_blit_with_palette_sse4_1(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
 static void fast_blit_with_palette_avx(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
@@ -112,14 +112,20 @@ void fast_blit_transparency_initialize(struct loader_shared_state *state, const 
 // Initializer function for fast_blit_with_palette
 void fast_blit_with_palette_initialize(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset) {
 	unsigned int eax, ebx, ecx, edx;
+	unsigned int avx2_eax, avx2_ebx, avx2_ecx, avx2_edx;
 	__get_cpuid(1, &eax, &ebx, &ecx, &edx);
-	if (ecx & bit_AVX2 && check_ymm_support()) {
+	__get_cpuid_count(7, 0, &avx2_eax, &avx2_ebx, &avx2_ecx, &avx2_edx);
+	if (avx2_ebx & bit_AVX2 && check_ymm_support()) {
+		printf("avx2");
 		fast_blit_with_palette = fast_blit_with_palette_avx2;
 	} else if (ecx & bit_AVX && check_ymm_support()) {
+		printf("avx");
 		fast_blit_with_palette = fast_blit_with_palette_avx;
 	} else if (ecx & bit_SSE4_1) {
+		printf("sse4.1");
 		fast_blit_with_palette = fast_blit_with_palette_sse4_1;
 	} else {
+		printf("default");
 		fast_blit_with_palette = fast_blit_with_palette_default;
 	}
 	fast_blit_with_palette(state, image_data, image_width, image_height, palette, x_offset, y_offset);
