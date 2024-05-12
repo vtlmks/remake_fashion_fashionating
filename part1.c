@@ -122,7 +122,8 @@ static uint32_t p1_fashionating_colors[] = {
 	0x6666ffff, 0x7777ffff, 0x8888ffff, 0x9999ffff, 0xaaaaffff, 0xbbbbffff, 0xcbcbffff,
 };
 
-static uint8_t p1_scroll_buffer[352 * 2 * 18];
+#define p1_scroll_buffer_width 352
+static uint8_t p1_scroll_buffer[p1_scroll_buffer_width * 2 * 18];
 static uint8_t p1_temp_buffer[(352 + P1_PRESENTS_FASHIONATING_WIDTH) * 15];
 
 static int32_t p1_stars[276];
@@ -366,8 +367,8 @@ static void decrunchEffect(struct loader_shared_state *state) {
 // [=]===^=====================================================================================^===[=]
 static void p1_scroller(struct loader_shared_state *state) {
 	static uint8_t *scroll_text_ptr = p1_scroll_text;
-	//static uint32_t xx = 0;
 	static uint32_t count = 96;
+
 	if(count == 96) {
 		count = 0;
 
@@ -376,12 +377,10 @@ static void p1_scroller(struct loader_shared_state *state) {
 		}
 
 		/* clear right side of buffer */
-		uint8_t *dest = p1_scroll_buffer + 352;
+		uint8_t *dest = p1_scroll_buffer + p1_scroll_buffer_width;
 		for(uint32_t y = 0; y < 18; ++y) {
-			for(uint32_t x = 0; x < 352; ++x) {
-				*dest++ = 0;
-			}
-			dest += 352;
+			memset(dest, 0, p1_scroll_buffer_width);
+			dest += p1_scroll_buffer_width*2;
 		}
 
 		/* write 22 characters to buffer */
@@ -393,12 +392,11 @@ static void p1_scroller(struct loader_shared_state *state) {
 				character -= 1;
 			}
 			uint8_t *font = p1_scroll_font_data + character * 24 * 16;
-			uint8_t *dest = p1_scroll_buffer + 352 + 16 * i;
+			uint8_t *dest = p1_scroll_buffer + p1_scroll_buffer_width + 16 * i;
 			for(uint32_t y = 0; y < 18; ++y) {
-				for(uint32_t x = 0; x < 16; ++x) {
-					*dest++ = *font++;
-				}
-				dest += 352 * 2 - 16;
+				_mm_storeu_si128((__m128i*)dest, _mm_loadu_si128((const __m128i*)font)); // Unaligned load and store
+				font += P1_SCROLL_FONT_WIDTH;
+				dest += p1_scroll_buffer_width * 2;
 			}
 		}
 	}
@@ -413,16 +411,16 @@ static void p1_scroller(struct loader_shared_state *state) {
 	uint32_t *data = state->buffer + 248 * state->buffer_width;
 
 	scr_src = p1_scroll_buffer;
-	uint32_t *scr_dest = data + ((state->buffer_width - 352) / 2);
+	uint32_t *scr_dest = data + ((state->buffer_width - p1_scroll_buffer_width) / 2);
 	for(uint32_t y = 0; y < 18; ++y) {
 		uint32_t *row = scr_dest;
-		for(uint32_t x = 0; x < 352; ++x) {
+		for(uint32_t x = 0; x < p1_scroll_buffer_width; ++x) {
 			if(*scr_src++) {
 				*row = scroll_colors[y];
 			}
 			row++;
 		}
-		scr_src += 352;
+		scr_src += p1_scroll_buffer_width;
 		scr_dest += state->buffer_width;
 	}
 	count++;
