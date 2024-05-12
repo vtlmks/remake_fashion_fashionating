@@ -149,17 +149,18 @@ struct point {
 	uint32_t x, y;
 };
 
+#define mo (368 - P1_ROTATING_LOGO_WIDTH)
 static struct point p1_bling_sprite_locations[] = {
-	{ 156-6, 103-6 },
-	{ 131-6,  79-6 },
-	{ 208-6,  79-6 },
-	{ 214-4,  55-6 },
-	{  92-6,  73-6 },
-	{ 258-4, 114-6 },
-	{ 278-3,  55-6 },
-	{ 258-4, 103-6 },
-	{ 189-6,  55-6 },
-	{  92-6, 113-6 },
+	{ 156-6-4, 103-6 },
+	{ 131-6-4,  79-6 },
+	{ 208-6-4,  79-6 },
+	{ 214-4-4,  55-6 },
+	{  92-6-4,  73-6 },
+	{ 258-4-4, 114-6 },
+	{ 278-3-4,  55-6 },
+	{ 258-4-4, 103-6 },
+	{ 189-6-4,  55-6 },
+	{  92-6-4, 113-6 },
 };
 
 typedef struct {
@@ -168,22 +169,23 @@ typedef struct {
 	void (*renderFunction)(struct loader_shared_state *, uint32_t);
 } AnimationStep;
 
-void render_blinking_square1(struct loader_shared_state *state, uint32_t frame);
-void render_blinking_square2(struct loader_shared_state *state, uint32_t frame);
-void render_loading_fashionating(struct loader_shared_state *state, uint32_t frame);
-void render_full_loading_fashionating(struct loader_shared_state *state, uint32_t frame);
-void render_typing_run(struct loader_shared_state *state, uint32_t frame);
-void render_full_loading_fashionating_run(struct loader_shared_state *state, uint32_t frame);
+void render_blinking_cursor(struct loader_shared_state *state, uint32_t frame);
+void render_repositioned_blinking_cursor(struct loader_shared_state *state, uint32_t frame);
+void render_type_load_command(struct loader_shared_state *state, uint32_t frame);
+void render_search_and_load_text(struct loader_shared_state *state, uint32_t frame);
+void render_type_run_command(struct loader_shared_state *state, uint32_t frame);
+void finalize_animation_sequence(struct loader_shared_state *state, uint32_t frame);
 
 // Array of animation steps (sentinel value at the end)
 static const AnimationStep animationSteps[] = {
-	{   0, 261, render_blinking_square1 },
-	{ 262, 421, render_loading_fashionating },
-	{ 422, 599, render_full_loading_fashionating },
-	{ 600, 859, render_blinking_square2 },
-	{ 860, 905, render_typing_run },
-	{ 600, 905, render_full_loading_fashionating_run },	// Parallel step (overlaps with previous two)
-	{  -1,  -1, 0 }										// Sentinel value to mark the end of the array
+
+	{   0, 261, render_blinking_cursor },							// Displays a blinking cursor
+	{ 262, 421, render_type_load_command },						// Types out the command `load "fashionating",8,1`
+	{ 422, 599, render_search_and_load_text },					// Displays `Searching for fashionating\nloading`
+	{ 600, 859, render_repositioned_blinking_cursor },			// Repositions and displays a blinking cursor
+	{ 860, 905, render_type_run_command },							// Types out the word `run`
+	{ 600, 905, finalize_animation_sequence },					// Finalizes the sequence, overlaps with previous steps
+	{  -1,  -1, 0 }														// Sentinel value to mark the end of the array
 };
 
 static void c64_effect(struct loader_shared_state *state) {
@@ -230,19 +232,19 @@ void render_blinking_square(struct loader_shared_state *state, uint32_t onoff, u
 	}
 }
 
-void render_blinking_square1(struct loader_shared_state *state, uint32_t frame) {
+void render_blinking_cursor(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
 	uint32_t *dst = (state->buffer + (28 + 48) * state->buffer_width + 20 + (skip / 2));
 	render_blinking_square(state, (frame >> 4) & 1, dst);
 }
 
-void render_blinking_square2(struct loader_shared_state *state, uint32_t frame) {
+void render_repositioned_blinking_cursor(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
 	uint32_t *dst = (state->buffer + (92 + 24) * state->buffer_width + 20 + (skip / 2));
 	render_blinking_square(state, (frame >> 4) & 1, dst);
 }
 
-void render_loading_fashionating(struct loader_shared_state *state, uint32_t frame) {
+void render_type_load_command(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
 	uint32_t *dst = (state->buffer + (28 + 48) * state->buffer_width + 20 + (skip / 2));
 	uint8_t *src = p1_c64_loading_run_data;
@@ -258,7 +260,7 @@ void render_loading_fashionating(struct loader_shared_state *state, uint32_t fra
 	}
 }
 
-void render_full_loading_fashionating(struct loader_shared_state *state, uint32_t frame) {
+void render_search_and_load_text(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
 	uint32_t *dst = (state->buffer + 76 * state->buffer_width + 20 + (skip / 2));
 	uint8_t *src = p1_c64_loading_run_data;
@@ -285,7 +287,7 @@ void render_full_loading_fashionating(struct loader_shared_state *state, uint32_
 	}
 }
 
-void render_typing_run(struct loader_shared_state *state, uint32_t frame) {
+void render_type_run_command(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
 	uint32_t *dst = (state->buffer + (92 + 24) * state->buffer_width + 20 + (skip / 2));
 	uint8_t *src = p1_c64_loading_run_data + 32 * P1_C64_LOADING_RUN_WIDTH;
@@ -301,7 +303,7 @@ void render_typing_run(struct loader_shared_state *state, uint32_t frame) {
 	}
 }
 
-void render_full_loading_fashionating_run(struct loader_shared_state *state, uint32_t frame) {
+void finalize_animation_sequence(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
 	uint32_t *dst = (state->buffer + 76 * state->buffer_width + 20 + (skip / 2));
 	uint8_t *src = p1_c64_loading_run_data;
@@ -410,19 +412,32 @@ static void p1_scroller(struct loader_shared_state *state) {
 
 	uint32_t *data = state->buffer + 248 * state->buffer_width;
 
-	scr_src = p1_scroll_buffer;
-	uint32_t *scr_dest = data + ((state->buffer_width - p1_scroll_buffer_width) / 2);
+	uint8_t *source = p1_scroll_buffer;
+	uint32_t *dest = data + ((state->buffer_width - p1_scroll_buffer_width) / 2);
+	__m128i zero = _mm_setzero_si128();  // Set a 128-bit zero for comparison
+
 	for(uint32_t y = 0; y < 18; ++y) {
-		uint32_t *row = scr_dest;
-		for(uint32_t x = 0; x < p1_scroll_buffer_width; ++x) {
-			if(*scr_src++) {
-				*row = scroll_colors[y];
-			}
-			row++;
+		uint32_t *row = dest;
+		__m128i color = _mm_set1_epi32(scroll_colors[y]);  // Set the color for the whole row
+
+		for(uint32_t x = 0; x < p1_scroll_buffer_width; x += 4) {
+			// Load 4 bytes as 32-bit integer but treat them as individual bytes
+			__m128i src = _mm_cvtsi32_si128(*(int32_t*)(source + x));
+			src = _mm_unpacklo_epi8(src, zero);  // Unpack bytes to 16-bit
+			src = _mm_unpacklo_epi16(src, zero);  // Unpack 16-bit to 32-bit
+			__m128i mask = _mm_cmpgt_epi32(src, zero);  // Compare to zero to create a mask
+			__m128i dest = _mm_loadu_si128((__m128i*)(row + x));  // Load 4 destination pixels
+			__m128i maskedColor = _mm_and_si128(color, mask);  // Apply color where mask is true
+			__m128i preservedDest = _mm_andnot_si128(mask, dest);  // Preserve dest where mask is false
+			__m128i result = _mm_or_si128(maskedColor, preservedDest);  // Combine the two
+
+			_mm_storeu_si128((__m128i*)(row + x), result);  // Store the result back to memory
 		}
-		scr_src += p1_scroll_buffer_width;
-		scr_dest += state->buffer_width;
+		source += p1_scroll_buffer_width*2;
+		dest += state->buffer_width;
 	}
+
+
 	count++;
 }
 

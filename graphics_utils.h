@@ -1,18 +1,137 @@
 #pragma once
 
+/**
+ * Function Dispatch System
+ * ========================
+ * Overview:
+ * This dispatch system is designed to optimize function calls across the application
+ * by dynamically selecting the most appropriate function implementation at runtime.
+ * Initially, function pointers are directed to initializer functions. These initializers
+ * determine the best-suited implementation based on the system's capabilities (e.g., support
+ * for SSE4.1, AVX) and then update the function pointers to point directly to the chosen
+ * implementations. This setup process occurs only once per function pointer, the first time
+ * each function is called, reducing overhead on subsequent calls.
+ *
+ * How It Works:
+ * 1. Initial Setup: Function pointers are set to their respective initializer functions.
+ *    These functions perform capability checks and configure the pointers to the optimal
+ *    implementation available.
+ * 2. First Call: On the first invocation, the initializer function is called. It sets the
+ *    function pointer to the appropriate actual function based on system capabilities.
+ * 3. Subsequent Calls: After the first call, the function pointer directly points to the
+ *    selected implementation, bypassing the initial checks and thus reducing overhead.
+ *
+ * Example Usage:
+ * The `fast_blit` function pointer is initially set to `fast_blit_initialize`. On the first
+ * call to `fast_blit`, it checks system capabilities, selects the best implementation (e.g.,
+ * `fast_blit_with_palette_avx2`), and updates the pointer to directly reference this function.
+ * All subsequent calls to `fast_blit` use the directly referenced function, enhancing performance.
+ *
+ * Benefits:
+ * - Reduced Runtime Overhead: Eliminates the need for repeated capability checks, which can
+ *   improve performance, especially in performance-critical sections of the application.
+ * - Flexibility and Scalability: Easily extend the system to include new implementations or
+ *   adapt to new hardware capabilities by adding additional checks and function implementations.
+ *
+ * Note:
+ * This approach requires careful handling to ensure thread safety if functions are potentially
+ * called from multiple threads concurrently. Make sure to synchronize the first call or restrict
+ * it to a single-threaded initialization phase.
+ */
+
+
 #include <cpuid.h>
 
-#include <immintrin.h>
 #include <xmmintrin.h>  // SSE
 #include <emmintrin.h>  // SSE2
 #include <smmintrin.h>	// SSE4.1
+#include <immintrin.h>	//
 
-// Function pointer types for each function
+// Forward declarations for initializer functions
+void fast_blit_initialize(struct loader_shared_state *state, const uint32_t *image, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
+void fast_blit_transparency_initialize(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
+void fast_blit_with_palette_initialize(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
+void render_and_clip_image_initialize(struct loader_shared_state *state, uint8_t *image_data, int image_width, int image_height, uint32_t *palette, int xOffset, int yOffset);
+
+// Forward declarations for all functions
+static uint32_t *pre_render_to_32bit_default(const uint8_t *image_8bit, uint32_t width, uint32_t height, const uint32_t *palette);
+
+static void fast_blit_default(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
+
+static void fast_blit_transparency_default(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
+
+static void render_and_clip_image_default(struct loader_shared_state *state, uint8_t *image_data, int image_width, int image_height, uint32_t *palette, int xOffset, int yOffset);
+
+static void fast_blit_with_palette_default(struct loader_shared_state *state,  const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
+static void fast_blit_with_palette_sse4_1(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
+static void fast_blit_with_palette_avx(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
+static void fast_blit_with_palette_avx2(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
+
+// Function pointer types and declarations
 typedef uint32_t *(*pre_render_to_32bit_func)(const uint8_t *, uint32_t, uint32_t, const uint32_t *);
 typedef void (*fast_blit_func)(struct loader_shared_state *, const uint32_t *, uint32_t, uint32_t, uint32_t, uint32_t);
 typedef void (*fast_blit_transparency_func)(struct loader_shared_state *, const uint32_t *, uint32_t, uint32_t, uint32_t, uint32_t);
 typedef void (*fast_blit_with_palette_func)(struct loader_shared_state *, const uint8_t *, uint32_t, uint32_t, const uint32_t *, uint32_t, uint32_t);
 typedef void (*render_and_clip_image_func)(struct loader_shared_state *, uint8_t *, int, int, uint32_t *, int, int);
+
+// Global function pointers initialized to initializer functions
+fast_blit_func fast_blit = fast_blit_initialize;
+fast_blit_transparency_func fast_blit_transparency = fast_blit_transparency_initialize;
+fast_blit_with_palette_func fast_blit_with_palette = fast_blit_with_palette_initialize;
+render_and_clip_image_func render_and_clip_image = render_and_clip_image_initialize;
+
+// Capability checking function
+static int check_ymm_support() {
+	unsigned int eax, edx;
+	__asm__ __volatile__("xgetbv" : "=a"(eax), "=d"(edx) : "c"(0));
+	return (eax & 0x6) == 0x6;
+}
+
+// Initializer function for fast_blit
+void fast_blit_initialize(struct loader_shared_state *state, const uint32_t *image, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset) {
+	unsigned int eax, ebx, ecx, edx;
+	if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) && (ecx & bit_SSE4_1)) {
+		// fast_blit = fast_blit_with_palette_sse4_1;
+	} else {
+		fast_blit = fast_blit_default;
+	}
+	fast_blit(state, image, image_width, image_height, x_offset, y_offset);
+}
+
+// Initializer function for fast_blit_transparency
+void fast_blit_transparency_initialize(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset) {
+	unsigned int eax, ebx, ecx, edx;
+	if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) && (ecx & bit_SSE4_1)) {
+		fast_blit_transparency = fast_blit_transparency_default;  // Assuming default supports SSE4.1 optimizations
+	} else {
+		fast_blit_transparency = fast_blit_transparency_default;
+	}
+	fast_blit_transparency(state, image_data, image_width, image_height, x_offset, y_offset);
+}
+
+// Initializer function for fast_blit_with_palette
+void fast_blit_with_palette_initialize(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset) {
+	unsigned int eax, ebx, ecx, edx;
+	__get_cpuid(1, &eax, &ebx, &ecx, &edx);
+	if (ecx & bit_AVX2 && check_ymm_support()) {
+		fast_blit_with_palette = fast_blit_with_palette_avx2;
+	} else if (ecx & bit_AVX && check_ymm_support()) {
+		fast_blit_with_palette = fast_blit_with_palette_avx;
+	} else if (ecx & bit_SSE4_1) {
+		fast_blit_with_palette = fast_blit_with_palette_sse4_1;
+	} else {
+		fast_blit_with_palette = fast_blit_with_palette_default;
+	}
+	fast_blit_with_palette(state, image_data, image_width, image_height, palette, x_offset, y_offset);
+}
+
+// Initializer function for render_and_clip_image
+void render_and_clip_image_initialize(struct loader_shared_state *state, uint8_t *image_data, int image_width, int image_height, uint32_t *palette, int xOffset, int yOffset) {
+	render_and_clip_image = render_and_clip_image_default;
+	render_and_clip_image(state, image_data, image_width, image_height, palette, xOffset, yOffset);
+}
+
+#if 0
 
 // Global function pointers
 static pre_render_to_32bit_func pre_render_to_32bit_ptr = NULL;
@@ -21,15 +140,6 @@ static fast_blit_transparency_func fast_blit_transparency_ptr = NULL;
 static fast_blit_with_palette_func fast_blit_with_palette_ptr = NULL;
 static render_and_clip_image_func render_and_clip_image_ptr = NULL;
 
-// Forward declarations for all functions
-static uint32_t *pre_render_to_32bit_default(const uint8_t *image_8bit, uint32_t width, uint32_t height, const uint32_t *palette);
-static void fast_blit_default(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
-static void fast_blit_transparency_default(struct loader_shared_state *state, const uint32_t *image_data, uint32_t image_width, uint32_t image_height, uint32_t x_offset, uint32_t y_offset);
-static void fast_blit_with_palette_default(struct loader_shared_state *state,  const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
-static void fast_blit_with_palette_sse4_1(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
-static void fast_blit_with_palette_avx(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
-static void fast_blit_with_palette_avx2(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset);
-static void render_and_clip_image_default (struct loader_shared_state *state,        uint8_t *image_data,      int image_width,      int image_height, uint32_t *palette, int xOffset, int yOffset);
 
 // Check OS support for YMM (used by AVX and AVX2)
 int check_ymm_support() {
@@ -111,7 +221,7 @@ void render_and_clip_image(struct loader_shared_state *state, uint8_t *image_dat
     }
     render_and_clip_image_ptr(state, image_data, image_width, image_height, palette, xOffset, yOffset);
 }
-
+#endif
 
 ////////////////////////////////////////////
 
