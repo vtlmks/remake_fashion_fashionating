@@ -114,15 +114,6 @@ static uint8_t half_sine_tab[] = {
 	0x17, 0x19, 0x1c, 0x1e, 0x21, 0x24, 0x27, 0x2a, 0x2d, 0x30, 0x33, 0x36, 0x39, 0x3c
 };
 
-// NOTE(peter): This is a copy of the font palette, as the image for the font lack the last color, easiest fix is to make a copy
-__attribute__((aligned(64)))
-static uint32_t p2_large_scroll_font_palette_use[] = {
-	0x00000000, 0x77aaddff, 0xddddddff, 0x666666ff, 0x002200ff, 0x000000ff, 0x000022ff, 0x000033ff,
-	0x111155ff, 0x222266ff, 0x333377ff, 0x444488ff, 0x5566aaff, 0x7777bbff, 0x9999ccff, 0xbbbbeeff,
-	0xeeeeffff, 0xffeeeeff, 0xeeccccff, 0xddbbbbff, 0xccaa99ff, 0xbbaa88ff, 0xbb9977ff, 0xaa9955ff,
-	0x999944ff, 0x888833ff, 0x667733ff, 0x556622ff, 0x445511ff, 0x225511ff, 0x114400ff, 0x00000000,
-};
-
 // [=]===^=====================================================================================^===[=]
 static void update_scroller(struct loader_shared_state *state) {
 	static uint8_t update = 0;
@@ -156,11 +147,11 @@ static void update_scroller(struct loader_shared_state *state) {
 		}
 	}
 
-	uint32_t temp = p2_large_scroll_font_palette_use[31];
+	uint32_t temp = p2_large_scroll_font_palette[31];
 	for(uint32_t i = 0; i < 28; ++i) {
-		p2_large_scroll_font_palette_use[(31 - i)] = p2_large_scroll_font_palette_use[(30 - i)];
+		p2_large_scroll_font_palette[(31 - i)] = p2_large_scroll_font_palette[(30 - i)];
 	}
-	p2_large_scroll_font_palette_use[4] = temp;
+	p2_large_scroll_font_palette[4] = temp;
 }
 
 // [=]===^=====================================================================================^===[=]

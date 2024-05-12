@@ -32,8 +32,9 @@ bin2h -i ../music/fashion-sample.raw -o fashion-sample
 popd > /dev/null
 
 # Build Linux version
-gcc -O2 -shared -fPIC -o "remake_$OUT_FILE.so" remake.c -I../../include
-# gcc -g -shared -fPIC -o "remake_$OUT_FILE.so" remake.c -I../../include
+#  -Wall -Wextra -pedantic -Wshadow -Wconversion
+# gcc -O2 -shared -fPIC -o "remake_$OUT_FILE.so" remake.c -I../../include
+gcc -g -O0 -shared -fPIC -o "remake_$OUT_FILE.so" remake.c -I../../include
 
 # Build Windows version
 x86_64-w64-mingw32-gcc -O2 -shared -o "remake_$OUT_FILE.dll" remake.c -I../../include

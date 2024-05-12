@@ -13,6 +13,9 @@
 #include <loader.h>
 #include <remake.h>
 
+#define UTILS_IMPLEMENTATION
+#include <utils.h>
+
 /*
  * Audio data
  */
@@ -37,7 +40,7 @@
 #include "data/p2_large_scroll_font.h"
 #include "data/p2_logo.h"
 #include "data/p2_stalaktites.h"
-#include "data/p3_Stars.h"
+#include "data/p3_stars.h"
 #include "data/p3_bob.h"
 #include "data/p3_eyes.h"
 #include "data/p3_flirty_eye.h"
@@ -60,20 +63,12 @@
 #include "graphics_utils.h"
 
 /*
- * Remake stuff
- */
-#include "loader.c"
-#include "part1.c"
-#include "part2.c"
-#include "part3.c"
-#include "part4.c"
-
-/*
  * local use
  */
 #include "protracker2.c"
 #define MKS_RESAMPLER_IMPLEMENTATION
 #include "../utility/resampler.h"
+
 
 struct sample_state {
 	int16_t *data;
@@ -88,8 +83,18 @@ struct remake  {
 	struct pt_state p3_parallax_2;
 	struct pt_state p4_ivory_tower;
 	struct sample_state sample;
+	struct rng_state rand_state;
 	uint32_t demo_state;									// Which demopart we are in
 };
+
+/*
+ * Remake stuff
+ */
+#include "loader.c"
+#include "part1.c"
+#include "part2.c"
+#include "part3.c"
+#include "part4.c"
 
 void setup(struct loader_shared_state *state) {
 	state->remake_userdata = (struct remake *)calloc(1, sizeof(struct remake));
@@ -101,6 +106,8 @@ void setup(struct loader_shared_state *state) {
 	pt2play_PlaySong(&remake->p2_world_of_the_dj, the_world_of_the_dj_data, CIA_TEMPO_MODE, 48000);
 	pt2play_PlaySong(&remake->p3_parallax_2, parallax_ii_data, CIA_TEMPO_MODE, 48000);
 	pt2play_PlaySong(&remake->p4_ivory_tower, ivorytowers_data, CIA_TEMPO_MODE, 48000);
+
+	xor_init_rng(&remake->rand_state, 0x44780142);
 }
 
 void cleanup(struct loader_shared_state *state) {
@@ -171,7 +178,7 @@ void key_callback(struct loader_shared_state *state, int key) {
 	}
 }
 
-int32_t mainloop_callback(struct loader_shared_state *state) {
+uint32_t mainloop_callback(struct loader_shared_state *state) {
 	struct remake *remake = (struct remake *)state->remake_userdata;
 	uint32_t *buffer = state->buffer;
 
@@ -193,7 +200,9 @@ int32_t mainloop_callback(struct loader_shared_state *state) {
 #endif
 
 	switch(remake->demo_state) {
-		case 1:
+		case 1: {
+			part_1_render(state);
+		} break;
 		case 3: {
 			part_2_render(state);
 		} break;
