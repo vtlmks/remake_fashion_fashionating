@@ -1,7 +1,29 @@
 
-// static uint32_t RoundReal32ToUInt32(float value) { return (uint32_t)_mm_cvtss_si32(_mm_set_ss(value)); }
-// static V4 RGBAUnpack4x8(uint32_t Packed) { return { (float)((Packed >> 0) & 0xff), (float)((Packed >> 8) & 0xff), (float)((Packed >> 16) & 0xff), (float)((Packed >> 24) & 0xff) }; }
-// static uint32_t RGBAPack4x8(V4 Unpacked) { return ((RoundReal32ToUInt32(Unpacked.a) << 24) | (RoundReal32ToUInt32(Unpacked.b) << 16) | (RoundReal32ToUInt32(Unpacked.g) << 8) | (RoundReal32ToUInt32(Unpacked.r) << 0)); }
+static uint32_t RoundReal32ToUInt32(float value) {
+	return (uint32_t)_mm_cvtss_si32(_mm_set_ss(value));
+}
+
+struct v4{
+	float r, g, b, a;
+};
+
+static struct v4 rgba_unpack_4x8(uint32_t packed) {
+	struct v4 result;
+	result.a = (float)((packed >>  0) & 0xff) / 255.0f;
+	result.b = (float)((packed >>  8) & 0xff) / 255.0f;
+	result.g = (float)((packed >> 16) & 0xff) / 255.0f;
+	result.r = (float)((packed >> 24) & 0xff) / 255.0f; // Divide by 255 for 0-1 range
+	return result;
+}
+
+static uint32_t rgba_pack_4x8(struct v4 unpacked) {
+	uint32_t result = 0;
+	result |= (uint32_t)(unpacked.a * 255.0f) << 0;
+	result |= (uint32_t)(unpacked.g * 255.0f) << 16;
+	result |= (uint32_t)(unpacked.b * 255.0f) << 8;
+	result |= (uint32_t)(unpacked.r * 255.0f) << 24; // Multiply by 255 for 0-255 range
+	return result;
+}
 
 #define p1_rotating_logo_steps 30
 #define p1_rotating_logo_frame_height (P1_ROTATING_LOGO_HEIGHT / p1_rotating_logo_steps)
@@ -106,7 +128,7 @@ static uint8_t p1_temp_buffer[(352 + P1_PRESENTS_FASHIONATING_WIDTH) * 15];
 static int32_t p1_stars[276];
 static int32_t p1_initialized = false;
 
-static uint32_t p1_star_colors[] = { 0xff444444, 0xff888888, 0xffbbbbbb, 0xffffffff };
+static uint32_t p1_star_colors[] = { 0x444444ff, 0x888888ff, 0xbbbbbbff, 0xffffffff };
 
 static uint32_t p1_presents_counter = 0;
 static uint32_t pixel_counter = 0;
@@ -139,200 +161,171 @@ static struct point p1_bling_sprite_locations[] = {
 	{  92-6, 113-6 },
 };
 
-
-static void c64_effect(struct loader_shared_state *state) {
-	//  background_audio_state.mute_sound = true;
-
-	// Fill background
-	memset(state->buffer, c64_colors_load_run[0], state->buffer_width * state->buffer_height * sizeof(uint32_t));
-
-	// Calculate offset for centering C64 screen data
-	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
-	uint32_t *dst = (uint32_t*)(state->buffer + 28 * state->buffer_width + skip / 2);
-
-	// Copy C64 screen data
-	uint8_t *src = p1_c64_screen_data;
-	for (uint32_t y = 0; y < P1_C64_SCREEN_HEIGHT; ++y) {
-		uint32_t *row = dst;
-		for(uint32_t x = 0; x < P1_C64_SCREEN_WIDTH; ++x) {
-			if(*src++) {
-				dst[x] = c64_colors_load_run[1];
-			}
-		}
-		dst += state->buffer_width;
-	}
-
-	// Handle loading animation based on frame number
-	if (p1_frame >= 0 && p1_frame < 906) {
-		uint32_t yOffset, xOffset, height, width;
-		if (p1_frame < 262) { // Blinking square
-			yOffset = 28 + 48;
-			xOffset = 20;
-			height = 8;
-			width = 8;
-			src = p1_c64_loading_run_data + ((p1_frame >> 4) & 1) * P1_C64_LOADING_RUN_WIDTH;
-		} else if (p1_frame < 422) { // Partial loading run
-			yOffset = 28 + 48;
-			xOffset = 20;
-			height = 8;
-			width = 7 * ((p1_frame - 256) >> 3);
-			src = p1_c64_loading_run_data;
-		} else if (p1_frame < 600) { // Full loading run (top)
-			yOffset = 76;
-			xOffset = 20;
-			height = 8;
-			width = P1_C64_LOADING_RUN_WIDTH;
-			src = p1_c64_loading_run_data;
-		} else { // Full loading run (top and bottom) & potentially blinking square
-			yOffset = 76;
-			xOffset = 20;
-			height = (p1_frame < 906) ? 32 : 8;
-			width = P1_C64_LOADING_RUN_WIDTH;
-			src = p1_c64_loading_run_data;
-		}
-
-		dst = (uint32_t*)(state->buffer + yOffset * state->buffer_width + xOffset + (skip / 2));
-		for (uint32_t y = 0; y < height; ++y) {
-			memcpy(dst, c64_colors_load_run + *src, width * sizeof(uint32_t));
-			src += P1_C64_LOADING_RUN_WIDTH;
-			dst += state->buffer_width;
-		}
-
-		// Additional blinking square for the later part of the animation
-		if (p1_frame >= 600 && p1_frame < 906) {
-			dst = (uint32_t*)(state->buffer + (92 + 24) * state->buffer_width + 20 + (skip / 2));
-			if (p1_frame < 860) {
-				src = p1_c64_loading_run_data + ((p1_frame >> 4) & 1) * P1_C64_LOADING_RUN_WIDTH; // Blinking square
-			} else {
-				src = p1_c64_loading_run_data + 32 * P1_C64_LOADING_RUN_WIDTH; // Partial loading run
-				width = 7 * ((p1_frame - 860) >> 3);
-			}
-
-			for (uint32_t y = 0; y < 8; ++y) {
-				memcpy(dst, c64_colors_load_run + *src, width * sizeof(uint32_t));
-				src += P1_C64_LOADING_RUN_WIDTH;
-				dst += state->buffer_width;
-			}
-		}
-	}
-}
-
-#if 0
-// Constants for frame ranges
-enum {
-    FRAME_STATIC_SCREEN_START = 0,
-    FRAME_STATIC_SCREEN_END = 262,
-    FRAME_LOADING_RUN_START = 262,
-    FRAME_LOADING_RUN_END = 422,
-    FRAME_EXPANDED_LOADING_RUN_START = 422,
-    FRAME_EXPANDED_LOADING_RUN_END = 906,
-    FRAME_FINAL_FLASHING_BLOCK_START = 600,
-    FRAME_FINAL_FLASHING_BLOCK_END = 860
-};
-
-// Animation stage definitions
 typedef struct {
-    uint32_t startFrame;
-    uint32_t endFrame;
-    void (*renderFunc)(struct loader_shared_state *state, uint32_t frame);
-} AnimationStage;
+	uint32_t startFrame;
+	uint32_t endFrame;	// Inclusive
+	void (*renderFunction)(struct loader_shared_state *, uint32_t);
+} AnimationStep;
 
-// Function prototypes for animation stages
-static void renderInitialScreen(struct loader_shared_state *state, uint32_t frame);
-static void renderStaticScreen(struct loader_shared_state *state, uint32_t frame);
-static void renderFlashingBlock(struct loader_shared_state *state, uint32_t frame);
-static void renderLoadingRun(struct loader_shared_state *state, uint32_t frame);
-static void renderExpandedLoadingRun(struct loader_shared_state *state, uint32_t frame);
-static void renderFinalFlashingBlock(struct loader_shared_state *state, uint32_t frame);
+void render_blinking_square1(struct loader_shared_state *state, uint32_t frame);
+void render_blinking_square2(struct loader_shared_state *state, uint32_t frame);
+void render_loading_fashionating(struct loader_shared_state *state, uint32_t frame);
+void render_full_loading_fashionating(struct loader_shared_state *state, uint32_t frame);
+void render_typing_run(struct loader_shared_state *state, uint32_t frame);
+void render_full_loading_fashionating_run(struct loader_shared_state *state, uint32_t frame);
 
-// Animation stages array
-static const AnimationStage animation_stages[] = {
-	{FRAME_STATIC_SCREEN_START, FRAME_STATIC_SCREEN_END, renderStaticScreen},
-	{FRAME_STATIC_SCREEN_START, FRAME_STATIC_SCREEN_END, renderFlashingBlock},
-	{FRAME_LOADING_RUN_START, FRAME_LOADING_RUN_END, renderLoadingRun},
-	{FRAME_EXPANDED_LOADING_RUN_START, FRAME_EXPANDED_LOADING_RUN_END, renderExpandedLoadingRun},
-	{FRAME_FINAL_FLASHING_BLOCK_START, FRAME_FINAL_FLASHING_BLOCK_END, renderFlashingBlock},
-	{FRAME_LOADING_RUN_START, FRAME_LOADING_RUN_END, renderLoadingRun}
+// Array of animation steps (sentinel value at the end)
+static const AnimationStep animationSteps[] = {
+	{   0, 261, render_blinking_square1 },
+	{ 262, 421, render_loading_fashionating },
+	{ 422, 599, render_full_loading_fashionating },
+	{ 600, 859, render_blinking_square2 },
+	{ 860, 905, render_typing_run },
+	{ 600, 905, render_full_loading_fashionating_run },	// Parallel step (overlaps with previous two)
+	{  -1,  -1, 0 }										// Sentinel value to mark the end of the array
 };
 
 static void c64_effect(struct loader_shared_state *state) {
 	// background_audio_state.mute_sound = true;
-	renderInitialScreen(state, 0); // Always render the initial screen
-	// Find the current animation stage based on p1_frame
-	for(int i = 0; i < sizeof(animation_stages) / sizeof(animation_stages[0]); ++i) {
-		if(p1_frame >= animation_stages[i].startFrame && p1_frame < animation_stages[i].endFrame) {
-			animation_stages[i].renderFunc(state, p1_frame);
-			break; // Found and rendered, no need to check further
-		}
-	}
-}
 
-static void renderInitialScreen(struct loader_shared_state *state, uint32_t frame) {
-	uint32_t *dst = state->buffer;
-	for (uint32_t i = 0; i < state->buffer_width * state->buffer_height; ++i) {
-		*dst++ = c64_colors_load_run[0]; // Solid color
+	// Fill background with the first color in the palette
+	uint32_t *dst = (uint32_t*)state->buffer;
+	uint32_t color = c64_colors_load_run[0];
+	for(uint32_t i = 0; i < state->buffer_width * state->buffer_height; ++i) {
+		*dst++ = color;
 	}
-}
 
-static void renderStaticScreen(struct loader_shared_state *state, uint32_t frame) {
+	// Calculate offset for centering C64 screen data
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
-	uint32_t *dst = (state->buffer + 28 * state->buffer_width + skip / 2);
+	dst = (uint32_t*)(state->buffer + 28 * state->buffer_width + skip / 2);
+
+	// Copy C64 screen data with color lookups
 	uint8_t *src = p1_c64_screen_data;
-	for (uint32_t y = 0; y < P1_C64_SCREEN_HEIGHT; ++y) {
-		uint32_t *row = dst;
+	for(uint32_t y = 0; y < P1_C64_SCREEN_HEIGHT; ++y) {
 		for(uint32_t x = 0; x < P1_C64_SCREEN_WIDTH; ++x) {
-			uint8_t val = *src++;
-			if(val) {
-				dst[x] = c64_colors_load_run[val];
-			}
+			*dst++ = c64_colors_load_run[*src++];  // Lookup color from LUT
+		}
+		dst += skip;
+	}
+
+	// Iterate through animation steps
+	int i = 0;
+	do {
+		if(p1_frame >= animationSteps[i].startFrame && p1_frame <= animationSteps[i].endFrame) {
+			animationSteps[i].renderFunction(state, p1_frame);
+		}
+		i++;
+	} while (animationSteps[i].startFrame != -1);  // Check sentinel value
+}
+
+void render_blinking_square(struct loader_shared_state *state, uint32_t onoff, uint32_t *dst) {
+	uint32_t color = c64_colors_load_run[onoff];
+	for(uint32_t y = 0; y < 8; ++y) {
+		uint32_t *row = dst;
+		for(uint32_t x = 0; x < 8; ++x) {
+			*row++ = color;
 		}
 		dst += state->buffer_width;
-		// src += P1_C64_SCREEN_WIDTH;
 	}
 }
 
-static void renderFlashingBlock(struct loader_shared_state *state, uint32_t frame) {
+void render_blinking_square1(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
 	uint32_t *dst = (state->buffer + (28 + 48) * state->buffer_width + 20 + (skip / 2));
-	for (uint32_t y = 0; y < 8; ++y) {
-		for (uint32_t x = 0; x < 8; ++x) {
-			*dst++ = c64_colors_load_run[(frame >> 4) & 1]; // Flashing color
-		}
-		dst += state->buffer_width - 8;
-	}
+	render_blinking_square(state, (frame >> 4) & 1, dst);
 }
 
-static void renderLoadingRun(struct loader_shared_state *state, uint32_t frame) {
+void render_blinking_square2(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
-	uint32_t *dst = (state->buffer + (frame < 600 ? 76 : 92 + 24) * state->buffer_width + 20 + (skip / 2));
-	uint8_t *src = p1_c64_loading_run_data + (frame >= 860 ? 32 * P1_C64_LOADING_RUN_WIDTH : 0); // Offset for final run
-
-	for (uint32_t y = 0; y < 8; ++y) {
-		uint32_t runLength = (frame < 860) ? 7 * ((frame - (frame < 422 ? 256 : 860)) >> 3) : P1_C64_LOADING_RUN_WIDTH;
-		for (uint32_t x = 0; x < runLength; ++x) {
-			*dst++ = c64_colors_load_run[*src++];
-		}
-		dst += state->buffer_width - runLength;
-		src += P1_C64_LOADING_RUN_WIDTH;
-	}
+	uint32_t *dst = (state->buffer + (92 + 24) * state->buffer_width + 20 + (skip / 2));
+	render_blinking_square(state, (frame >> 4) & 1, dst);
 }
 
-static void renderExpandedLoadingRun(struct loader_shared_state *state, uint32_t frame) {
-	renderLoadingRun(state, frame); // Reuse the loading run rendering
-
-	// Expand vertically
+void render_loading_fashionating(struct loader_shared_state *state, uint32_t frame) {
 	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
-	uint32_t *dst = (state->buffer + 92 * state->buffer_width + 20 + (skip / 2));
+	uint32_t *dst = (state->buffer + (28 + 48) * state->buffer_width + 20 + (skip / 2));
 	uint8_t *src = p1_c64_loading_run_data;
-	uint32_t height = (frame < 600) ? 16 : 24; // Increase height in the later stage
 
-	for (uint32_t y = 0; y < height; ++y) {
-		memcpy(dst, src, P1_C64_LOADING_RUN_WIDTH);
+	for(uint32_t y = 0; y < 8; ++y) {
+		uint32_t *row = dst;
+		uint8_t *source = src;
+		for(uint32_t x = 0; x < 7 * ((p1_frame - 256) >> 3); ++x) {
+			*row++ = c64_colors_load_run[*source++];
+		}
 		dst += state->buffer_width;
 		src += P1_C64_LOADING_RUN_WIDTH;
 	}
 }
-#endif
+
+void render_full_loading_fashionating(struct loader_shared_state *state, uint32_t frame) {
+	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
+	uint32_t *dst = (state->buffer + 76 * state->buffer_width + 20 + (skip / 2));
+	uint8_t *src = p1_c64_loading_run_data;
+
+	for(uint32_t y = 0; y < 8; ++y) {
+		uint32_t *row = dst;
+		uint8_t *source = src;
+		for(uint32_t x = 0; x < P1_C64_LOADING_RUN_WIDTH; ++x) {
+			*row++ = c64_colors_load_run[*source++];
+		}
+		dst += state->buffer_width;
+		src += P1_C64_LOADING_RUN_WIDTH;
+	}
+
+	dst = (state->buffer + 92 * state->buffer_width + 20 + (skip / 2));
+	for(uint32_t y = 0; y < 16; ++y) {
+		uint32_t *row = dst;
+		uint8_t *source = src;
+		for(uint32_t x = 0; x < P1_C64_LOADING_RUN_WIDTH; ++x) {
+			*row++ = c64_colors_load_run[*source++];
+		}
+		dst += state->buffer_width;
+		src += P1_C64_LOADING_RUN_WIDTH;
+	}
+}
+
+void render_typing_run(struct loader_shared_state *state, uint32_t frame) {
+	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
+	uint32_t *dst = (state->buffer + (92 + 24) * state->buffer_width + 20 + (skip / 2));
+	uint8_t *src = p1_c64_loading_run_data + 32 * P1_C64_LOADING_RUN_WIDTH;
+
+	for(uint32_t y = 0; y < 8; ++y) {
+		uint32_t *row = dst;
+		uint8_t *source = src;
+		for(uint32_t x = 0; x < 7 * ((frame - 860) >> 3); ++x) {
+			*row++ = c64_colors_load_run[*source++];
+		}
+		dst += state->buffer_width;
+		src += P1_C64_LOADING_RUN_WIDTH;
+	}
+}
+
+void render_full_loading_fashionating_run(struct loader_shared_state *state, uint32_t frame) {
+	uint32_t skip = (state->buffer_width - P1_C64_SCREEN_WIDTH);
+	uint32_t *dst = (state->buffer + 76 * state->buffer_width + 20 + (skip / 2));
+	uint8_t *src = p1_c64_loading_run_data;
+
+	for(uint32_t y = 0; y < 8; ++y) {
+		uint32_t *row = dst;
+		uint8_t *source = src;
+		for(uint32_t x = 0; x < P1_C64_LOADING_RUN_WIDTH; ++x) {
+			*row++ = c64_colors_load_run[*source++];
+		}
+		dst += state->buffer_width;
+		src += P1_C64_LOADING_RUN_WIDTH;
+	}
+
+	dst = (state->buffer + 92 * state->buffer_width + 20 + (skip / 2));
+	for(uint32_t y = 0; y < 24; ++y) {
+		uint32_t *row = dst;
+		uint8_t *source = src;
+		for(uint32_t x = 0; x < P1_C64_LOADING_RUN_WIDTH; ++x) {
+			*row++ = c64_colors_load_run[*source++];
+		}
+		dst += state->buffer_width;
+		src += P1_C64_LOADING_RUN_WIDTH;
+	}
+}
 
 // [=]===^=====================================================================================^===[=]
 static void decrunchEffect(struct loader_shared_state *state) {
@@ -472,30 +465,30 @@ static int32_t part_1_render(struct loader_shared_state *state) {
 		++rotatingLogoStep;
 	}
 
-	if(p1_frame >= 1188 && p1_frame < 1444) {		// Fade from black to white in 256 frames
+	if (p1_frame >= 1188 && p1_frame < 1444) { // Fade from black to white in 256 frames
+		uint8_t grayValue = (uint8_t)(p1_frame - 1188);
+		uint32_t color = (grayValue << 24) | (grayValue << 16) | (grayValue << 8) | grayValue;
 
-		// float t = (256.f - (1443.f - (float)p1_frame)) / 256;
-		// for(uint32_t i = 0; i < arraysize(p1_rotating_logo_fade_colors); ++i) {
-		// 	float col = blend(0.f, t, 1.f);
-		// 	uint32_t color = (uint8_t)(col * 255.f) << 24 | (uint8_t)(col * 255.f) << 16 | (uint8_t)(col * 255.f) << 8 | (uint8_t)(col * 255.f);
-		// 	p1_rotating_logo_fade_colors[i] = color;
-		// }
+		for (uint32_t i = 0; i < arraysize(p1_rotating_logo_fade_colors); ++i) {
+			p1_rotating_logo_fade_colors[i] = color; // All pixels get the same grayscale
+		}
 	}
 
-	if(p1_frame >= 1444 && p1_frame < 1494) {
-		float t = (50.f - (1493.f - (float)p1_frame)) / 50;
+	if (p1_frame >= 1444 && p1_frame < 1494) { // Fade from white to final colors
+		float t = (float)(p1_frame - 1444) / 50.0f;  // 0.0 to 1.0 over 50 frames
 
-		// for(uint32_t i = 0; i < arraysize(p1_rotating_logo_fade_colors); ++i) {
-		// 	V4 src_color = { 255.f, 255.f, 255.f, 255.f };
-		// 	V4 dest_color = RGBAUnpack4x8(p1_rotating_logo_final_colors[i]);
-		// 	V4 new_color;
-		// 	new_color.r = blend(src_color.r, t, dest_color.r);
-		// 	new_color.g = blend(src_color.g, t, dest_color.g);
-		// 	new_color.b = blend(src_color.b, t, dest_color.b);
-		// 	new_color.a = blend(src_color.a, t, dest_color.a);
-		// 	uint32_t color = RGBAPack4x8(new_color);
-		// 	p1_rotating_logo_fade_colors[i] = color;
-		// }
+		for(uint32_t i = 0; i < arraysize(p1_rotating_logo_fade_colors); ++i) {
+			struct v4 srcColor = rgba_unpack_4x8(0xffffffff); // White
+			struct v4 destColor = rgba_unpack_4x8(p1_rotating_logo_final_colors[i]);
+			struct v4 newColor = {
+				.r = blend(srcColor.r, t, destColor.r),
+				.g = blend(srcColor.g, t, destColor.g),
+				.b = blend(srcColor.b, t, destColor.b),
+				.a = blend(srcColor.a, t, destColor.a)  // Blend alpha as well
+			};
+
+			p1_rotating_logo_fade_colors[i] = rgba_pack_4x8(newColor);
+		}
 	}
 
 	if(p1_frame >= 1154) {
@@ -507,7 +500,6 @@ static int32_t part_1_render(struct loader_shared_state *state) {
 			uint32_t offset = state->buffer_width + 30;
 			for(uint32_t i = 0; i < state->buffer_height; ++i) {
 				p1_stars[i] = offset + xor_generate_random(&remake->rand_state) % (state->buffer_width + 30);
-
 			}
 			p1_initialized = true;
 		}
