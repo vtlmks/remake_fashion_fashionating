@@ -76,7 +76,7 @@ static void p4_color_cycle(uint32_t *colors) {
 	colors[31] = temp;
 }
 
-static int32_t part_4_render(struct loader_shared_state *state) {
+static int32_t part_4_render(struct remake_state *state) {
 	static struct {
 		uint32_t counter;
 		uint32_t scroll;
@@ -86,14 +86,14 @@ static int32_t part_4_render(struct loader_shared_state *state) {
 	} p4_state = {0};
 
 	// Center logos
-	uint32_t x_center = (state->buffer_width - LOADER_LOGO_WIDTH) >> 1;
+	uint32_t x_center = (state->shared->buffer_width - LOADER_LOGO_WIDTH) >> 1;
 
 	// Blit logos
-	fast_blit_with_palette(state, loader_logo_data, LOADER_LOGO_WIDTH, LOADER_LOGO_HEIGHT, fsn_top_logo_colors, x_center, P4_TOP_LOGO_Y_OFFSET);
-	fast_blit_with_palette(state, loader_logo_data, LOADER_LOGO_WIDTH, LOADER_LOGO_HEIGHT, fsn_bottom_logo_colors, x_center, P4_BOTTOM_LOGO_Y_OFFSET);
+	fast_blit_with_palette(state->shared, loader_logo_data, LOADER_LOGO_WIDTH, LOADER_LOGO_HEIGHT, fsn_top_logo_colors, x_center, P4_TOP_LOGO_Y_OFFSET);
+	fast_blit_with_palette(state->shared, loader_logo_data, LOADER_LOGO_WIDTH, LOADER_LOGO_HEIGHT, fsn_bottom_logo_colors, x_center, P4_BOTTOM_LOGO_Y_OFFSET);
 
 	// Color cycle
-	if(state->frame_number % 2 == 0) {
+	if(state->shared->frame_number % 2 == 0) {
 		p4_color_cycle(fsn_top_logo_colors);
 		p4_color_cycle(fsn_bottom_logo_colors);
 	}
@@ -128,7 +128,7 @@ static int32_t part_4_render(struct loader_shared_state *state) {
 	}
 
 	// Render scroll buffer
-	uint32_t *data = state->buffer + (P4_UPSCROLL_Y_POS * state->buffer_width + ((state->buffer_width - P4_UPSCROLL_WIDTH) / 2));
+	uint32_t *data = state->shared->buffer + (P4_UPSCROLL_Y_POS * state->shared->buffer_width + ((state->shared->buffer_width - P4_UPSCROLL_WIDTH) / 2));
 	uint8_t *src = p4_scroll_buffer;
 
 	for(uint32_t y = 0; y < P4_UPSCROLL_VISIBLE_HEIGHT; ++y) {
@@ -141,7 +141,7 @@ static int32_t part_4_render(struct loader_shared_state *state) {
 			__m128i result = _mm_and_si128(mask, values_to_write);
 			_mm_storeu_si128((__m128i*)(data + x), result);
 		}
-		data += state->buffer_width;
+		data += state->shared->buffer_width;
 		src += P4_UPSCROLL_WIDTH;
 	}
 

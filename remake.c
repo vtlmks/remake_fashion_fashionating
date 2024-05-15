@@ -77,7 +77,8 @@ struct sample_state {
 	bool done;
 };
 
-struct remake  {
+struct remake_state {
+	struct loader_shared_state *shared;
 	struct pt_state p1_fashionating;
 	struct pt_state p2_world_of_the_dj;
 	struct pt_state p3_parallax_2;
@@ -97,10 +98,11 @@ struct remake  {
 #include "part4.c"
 
 void setup(struct loader_shared_state *state) {
-	state->remake_userdata = (struct remake *)calloc(1, sizeof(struct remake));
-	struct remake *remake = (struct remake *)state->remake_userdata;
+	state->remake_state = (struct remake_state *)calloc(1, sizeof(struct remake_state));
+	struct remake_state *remake = (struct remake_state *)state->remake_state;
+	remake->shared = state;
 
-	remake->sample.data = resample_audio(fashion_sample_data, FASHION_SAMPLE_DATA_SIZE, 267, &remake->sample.size);
+	remake->sample.data = resample_audio((int8_t*)fashion_sample_data, FASHION_SAMPLE_DATA_SIZE, 267, &remake->sample.size);
 	pt2play_initPlayer(48000);
 	pt2play_PlaySong(&remake->p1_fashionating, fashionating_data, CIA_TEMPO_MODE, 48000);
 	pt2play_PlaySong(&remake->p2_world_of_the_dj, the_world_of_the_dj_data, CIA_TEMPO_MODE, 48000);
@@ -111,32 +113,31 @@ void setup(struct loader_shared_state *state) {
 }
 
 void cleanup(struct loader_shared_state *state) {
-	struct remake *remake = (struct remake *)state->remake_userdata;
+	struct remake_state *remake = (struct remake_state *)state->remake_state;
 	// NOTE(peter): clean up allocations here et.c
 	free(remake->sample.data);
-	free(state->remake_userdata);
-	state->remake_userdata = 0;
+	free(state->remake_state);
+	state->remake_state = 0;
 }
 
-void audio_callback(struct loader_shared_state *state, int16_t *audio_buffer, size_t frames) {
-	struct remake *remake = (struct remake *)state->remake_userdata;
+void audio_callback(struct remake_state *state, int16_t *audio_buffer, size_t frames) {
 
-	switch(remake->demo_state) {
+	switch(state->demo_state) {
 
 		// TODO(peter): make this a statemachine for part 1, as the sample shouldn't begin playing until a certain time, and then the module should start at yet another later time.
 		case 1: {
-			if(remake->sample.done) {
-				pt2play_FillAudioBuffer(&remake->p1_fashionating, audio_buffer, frames);
+			if(state->sample.done) {
+				pt2play_FillAudioBuffer(&state->p1_fashionating, audio_buffer, frames);
 			} else {
 				int16_t *dst = audio_buffer;
 				for(uint32_t i = 0; i < frames; ++i) {
-					int16_t sample = remake->sample.data[remake->sample.position];
+					int16_t sample = state->sample.data[state->sample.position];
 					sample = (int16_t)(sample * 0.707);
 					*dst++ = sample;
 					*dst++ = sample;
-					remake->sample.position++;
-					if(remake->sample.position == remake->sample.size) {
-						remake->sample.done = true;
+					state->sample.position++;
+					if(state->sample.position == state->sample.size) {
+						state->sample.done = true;
 						break;
 					}
 				}
@@ -144,15 +145,15 @@ void audio_callback(struct loader_shared_state *state, int16_t *audio_buffer, si
 		} break;
 
 		case 3: {
-			pt2play_FillAudioBuffer(&remake->p2_world_of_the_dj, audio_buffer, frames);
+			pt2play_FillAudioBuffer(&state->p2_world_of_the_dj, audio_buffer, frames);
 		} break;
 
 		case 5: {
-			pt2play_FillAudioBuffer(&remake->p3_parallax_2, audio_buffer, frames);
+			pt2play_FillAudioBuffer(&state->p3_parallax_2, audio_buffer, frames);
 		} break;
 
 		case 7: {
-			pt2play_FillAudioBuffer(&remake->p4_ivory_tower, audio_buffer, frames);
+			pt2play_FillAudioBuffer(&state->p4_ivory_tower, audio_buffer, frames);
 		} break;
 
 		default: {
@@ -162,44 +163,42 @@ void audio_callback(struct loader_shared_state *state, int16_t *audio_buffer, si
 }
 
 
-void key_callback(struct loader_shared_state *state, int key) {
-	struct remake *remake = (struct remake *)state->remake_userdata;
-	if(state->keyboard_state[REMAKE_KEY_1]) {
-		remake->demo_state = 1;
+void key_callback(struct remake_state *state, int key) {
+	if(state->shared->keyboard_state[REMAKE_KEY_1]) {
+		state->demo_state = 1;
 	}
-	if(state->keyboard_state[REMAKE_KEY_2]) {
-		remake->demo_state = 3;
+	if(state->shared->keyboard_state[REMAKE_KEY_2]) {
+		state->demo_state = 3;
 	}
-	if(state->keyboard_state[REMAKE_KEY_3]) {
-		remake->demo_state = 5;
+	if(state->shared->keyboard_state[REMAKE_KEY_3]) {
+		state->demo_state = 5;
 	}
-	if(state->keyboard_state[REMAKE_KEY_4]) {
-		remake->demo_state = 7;
+	if(state->shared->keyboard_state[REMAKE_KEY_4]) {
+		state->demo_state = 7;
 	}
 }
 
-uint32_t mainloop_callback(struct loader_shared_state *state) {
-	struct remake *remake = (struct remake *)state->remake_userdata;
-	uint32_t *buffer = state->buffer;
+uint32_t mainloop_callback(struct remake_state *state) {
+	uint32_t *buffer = state->shared->buffer;
 
-	memset(buffer, 0, state->buffer_width*state->buffer_height*sizeof(uint32_t));
+	memset(buffer, 0, state->shared->buffer_width * state->shared->buffer_height * sizeof(uint32_t));
 
 #if 0
-	switch(remake->demo_state) {
+	switch(state->demo_state) {
 		case 1: { part_1_render(state); } break;
 		case 3: { part_1_render(state); } break;
 		case 5: { part_1_render(state); } break;
 		case 7: { part_1_render(state); } break;
 		default: {
 			if(loader(state)) {
-				remake->demo_state++;
+				state->demo_state++;
 			}
 		} break;
 
 	}
 #endif
 
-	switch(remake->demo_state) {
+	switch(state->demo_state) {
 		case 1: {
 			part_1_render(state);
 		} break;
@@ -210,21 +209,21 @@ uint32_t mainloop_callback(struct loader_shared_state *state) {
 		case 7: {
 			part_4_render(state);
 
-			if(state->mouse_button_state[REMAKE_MOUSE_BUTTON_LEFT]) {
-				remake->demo_state++;
-				if(remake->demo_state == 8) {
-					remake->demo_state = 0;
+			if(state->shared->mouse_button_state[REMAKE_MOUSE_BUTTON_LEFT]) {
+				state->demo_state++;
+				if(state->demo_state == 8) {
+					state->demo_state = 0;
 				}
-				printf("%d\n", remake->demo_state);
+				printf("%d\n", state->demo_state);
 			}
 		} break;
 		default: {
 #if 0
 			if(loader(state)) {
-				remake->demo_state++;
+				state->demo_state++;
 			}
 #else
-			remake->demo_state++;
+			state->demo_state++;
 #endif
 		}
 	}

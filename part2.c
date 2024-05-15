@@ -115,7 +115,7 @@ static uint8_t half_sine_tab[] = {
 };
 
 // [=]===^=====================================================================================^===[=]
-static void update_scroller(struct loader_shared_state *state) {
+static void update_scroller(struct remake_state *state) {
 	static uint8_t update = 0;
 	static uint8_t scroll_counter = 0;
 
@@ -155,7 +155,7 @@ static void update_scroller(struct loader_shared_state *state) {
 }
 
 // [=]===^=====================================================================================^===[=]
-static void render_tech_tech(struct loader_shared_state *state) {
+static void render_tech_tech(struct remake_state *state) {
 
 	uint8_t logo_line = 0;
 	uint8_t tmp_dup_line_index = dup_line_index;
@@ -164,8 +164,8 @@ static void render_tech_tech(struct loader_shared_state *state) {
 	uint8_t temp_ttcol_id1 = ttcol_id1;
 	uint8_t temp_ttcol_id2 = ttcol_id2;
 	uint8_t temp_ttsine_id = ttsineid;
-	uint32_t *Row = state->buffer + (172 * state->buffer_width);
-	Row += ((state->buffer_width - P2_LOGO_WIDTH) / 2) - 4;
+	uint32_t *Row = state->shared->buffer + (172 * state->shared->buffer_width);
+	Row += ((state->shared->buffer_width - P2_LOGO_WIDTH) / 2) - 4;
 
 	for(uint8_t line_count = 0; line_count < 56; ++line_count) {
 		if(dup_lines == 0) {
@@ -196,7 +196,7 @@ static void render_tech_tech(struct loader_shared_state *state) {
 		if(dup_lines) {
 			--dup_lines;
 		}
-		Row += state->buffer_width;
+		Row += state->shared->buffer_width;
 		++temp_ttcol_id1;
 		++temp_ttcol_id2;
 		++temp_ttsine_id;
@@ -207,7 +207,7 @@ static void render_tech_tech(struct loader_shared_state *state) {
 	}
 }
 
-static void part_2_render(struct loader_shared_state *state) {
+static void part_2_render(struct remake_state *state) {
 
 	//	accumulator += dt;
 	if(!p2_initialized) {
@@ -221,7 +221,7 @@ static void part_2_render(struct loader_shared_state *state) {
 
 
 	// NOTE(peter): every other frame
-	if(state->frame_number & 0x1) {
+	if(state->shared->frame_number & 0x1) {
 		dup_line_index = (dup_line_index + 2) % arraysize(dup_line_tab);
 		ttcol_id1 = (ttcol_id1 - 1 + arraysize(tech_tech_colors)) % arraysize(tech_tech_colors);
 		ttcol_id2 = (ttcol_id2 + 1) % arraysize(tech_tech_colors);
@@ -235,7 +235,7 @@ static void part_2_render(struct loader_shared_state *state) {
 
 
 	// Render Scroller
-	uint32_t *row = state->buffer + (242 * state->buffer_width) + ((state->buffer_width - p2_scrollerWidth) / 2);
+	uint32_t *row = state->shared->buffer + (242 * state->shared->buffer_width) + ((state->shared->buffer_width - p2_scrollerWidth) / 2);
 	uint8_t *src = scroll_buffer;
 	for(uint32_t i = 0; i < p2_scrollerHeight; ++i) {
 		uint32_t *pixel = row;
@@ -246,7 +246,7 @@ static void part_2_render(struct loader_shared_state *state) {
 			++pixel;
 			++src;
 		}
-		row += state->buffer_width;
+		row += state->shared->buffer_width;
 		src += p2_scrollCharWidth;
 	}
 
