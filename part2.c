@@ -115,6 +115,16 @@ static uint8_t half_sine_tab[] = {
 };
 
 // [=]===^=====================================================================================^===[=]
+static void render_copper(struct remake_state *state, uint32_t start_line, uint32_t *copper_data, uint32_t rows) {
+	uint32_t *row = state->shared->buffer + (start_line * state->shared->buffer_width);
+	for(uint32_t copper_line = 0; copper_line < rows; ++copper_line) {
+		for(uint32_t i = 0; i < state->shared->buffer_width; ++i) {
+			*row++ = copper_data[copper_line];
+		}
+	}
+}
+
+// [=]===^=====================================================================================^===[=]
 static void update_scroller(struct remake_state *state) {
 	static uint8_t update = 0;
 	static uint8_t scroll_counter = 0;
@@ -156,60 +166,49 @@ static void update_scroller(struct remake_state *state) {
 
 // [=]===^=====================================================================================^===[=]
 static void render_tech_tech(struct remake_state *state) {
-
 	uint8_t logo_line = 0;
 	uint8_t tmp_dup_line_index = dup_line_index;
 	uint8_t dup_lines = dup_line_tab[tmp_dup_line_index];
 
-	uint8_t temp_ttcol_id1 = ttcol_id1;
+	int8_t temp_ttcol_id1 = ttcol_id1;
 	uint8_t temp_ttcol_id2 = ttcol_id2;
 	uint8_t temp_ttsine_id = ttsineid;
-	uint32_t *Row = state->shared->buffer + (172 * state->shared->buffer_width);
-	Row += ((state->shared->buffer_width - P2_LOGO_WIDTH) / 2) - 4;
 
-	for(uint8_t line_count = 0; line_count < 56; ++line_count) {
-		if(dup_lines == 0) {
+	uint32_t *restrict row = state->shared->buffer + (172 * state->shared->buffer_width);
+	row += ((state->shared->buffer_width - P2_LOGO_WIDTH) / 2) - 4;
+
+	for (uint8_t line_count = 0; line_count < 56; ++line_count) {
+		if (dup_lines == 0) {
 			++logo_line;
-			tmp_dup_line_index += 1;
-			if(tmp_dup_line_index >= arraysize(dup_line_tab)) {
-				tmp_dup_line_index = 0;
-			}
+			tmp_dup_line_index = (tmp_dup_line_index + 1) % arraysize(dup_line_tab);
 			dup_lines = dup_line_tab[tmp_dup_line_index];
 		}
 
-		if(logo_line == P2_LOGO_HEIGHT) break;
+		if (logo_line == P2_LOGO_HEIGHT) break;
 
-		uint32_t *pixel = Row;
-		pixel += tech_tech_sine[temp_ttsine_id];
-		for(uint16_t xx = 0; xx < P2_LOGO_WIDTH; ++xx) {
-			uint8_t color_id = p2_logo_data[(logo_line * P2_LOGO_WIDTH) + xx];
-			if(color_id) {
-				if(color_id == 1) {
-					*pixel = tech_tech_colors[temp_ttcol_id2];
-				} else {
-					*pixel = tech_tech_colors[temp_ttcol_id1];
-				}
+		uint32_t *restrict pixel = row + tech_tech_sine[temp_ttsine_id];
+		const uint8_t *restrict logo_data = p2_logo_data + (logo_line * P2_LOGO_WIDTH);
+		for (uint16_t xx = 0; xx < P2_LOGO_WIDTH; ++xx) {
+			uint8_t color_id = logo_data[xx];
+			if (color_id) {
+				*pixel = (color_id == 1) ? tech_tech_colors[temp_ttcol_id2] : tech_tech_colors[temp_ttcol_id1];
 			}
 			++pixel;
 		}
 
-		if(dup_lines) {
+		if (dup_lines) {
 			--dup_lines;
 		}
-		Row += state->shared->buffer_width;
-		++temp_ttcol_id1;
-		++temp_ttcol_id2;
-		++temp_ttsine_id;
 
-		if(temp_ttcol_id1 == arraysize(tech_tech_colors))	temp_ttcol_id1 = 0;
-		if(temp_ttcol_id2 == arraysize(tech_tech_colors))	temp_ttcol_id2 = 0;
-		if(temp_ttsine_id == arraysize(tech_tech_sine))	temp_ttsine_id = 0;
+		row += state->shared->buffer_width;
+		temp_ttcol_id1 = (temp_ttcol_id1 + 1) % arraysize(tech_tech_colors);
+		temp_ttcol_id2 = (temp_ttcol_id2 + 1) % arraysize(tech_tech_colors);
+		temp_ttsine_id = (temp_ttsine_id + 1) % arraysize(tech_tech_sine);
 	}
 }
 
 static void part_2_render(struct remake_state *state) {
 
-	//	accumulator += dt;
 	if(!p2_initialized) {
 		for(uint8_t i = 0; i < arraysize(ball_springs); ++i) {
 			ball_springs[i].ball_anim_offset = 2 * i;
@@ -228,12 +227,28 @@ static void part_2_render(struct remake_state *state) {
 	}
 	ttsineid = (ttsineid + 1) % arraysize(tech_tech_sine);
 
+	for(uint32_t i = 0; i < arraysize(ball_springs); ++i) {
+		ball_springs[i].ball_anim_offset += 1;
+		if(ball_springs[i].ball_anim_offset >= 30) {
+			ball_springs[i].ball_anim_offset = 0;
+		}
+	}
+	for(uint32_t i = 0; i < arraysize(ball_springs); ++i) {
+		ball_springs[i].offset += 1;
+		if(ball_springs[i].offset == arraysize(spring_anim_offset)) {
+			ball_springs[i].offset = 0;
+		}
+	}
 
-	update_scroller(state);
+	// render - copper background.
+	render_copper(state, springsCopperStart, springs_copper, arraysize(springs_copper));
+	render_copper(state, scrollerCopperStart, scroller_copper, arraysize(scroller_copper));
 
+	fast_blit_with_palette(state->shared, p2_stalaktites_data, P2_STALAKTITES_WIDTH, P2_STALAKTITES_HEIGHT, p2_stalaktites_palette, (state->shared->buffer_width - P2_STALAKTITES_WIDTH) / 2, 111);
 	render_tech_tech(state);
 
 
+	update_scroller(state);
 	// Render Scroller
 	uint32_t *row = state->shared->buffer + (242 * state->shared->buffer_width) + ((state->shared->buffer_width - p2_scrollerWidth) / 2);
 	uint8_t *src = scroll_buffer;
@@ -248,6 +263,59 @@ static void part_2_render(struct remake_state *state) {
 		}
 		row += state->shared->buffer_width;
 		src += p2_scrollCharWidth;
+	}
+
+
+	// Springs
+	for(uint32_t i = 0; i < arraysize(ball_springs); ++i) {
+
+#define first_ball_spring_x 86
+#define distance_to_next 32
+#define spring_width 18
+#define spring_offset_y 84
+#define ball_width 20
+#define ball_height 20
+#define ball_offset_y 25
+
+		// ball
+		row = state->shared->buffer + first_ball_spring_x - 1 + distance_to_next * i;
+		row += half_sine_tab[ball_springs[i].offset] * state->shared->buffer_width;
+		row += ball_offset_y * state->shared->buffer_width;
+		uint8_t *colId = p2_bouncing_balls_data;
+		colId += (ball_springs[i].ball_anim_offset / 2) * ball_width;
+		colId += ball_height * P2_BOUNCING_BALLS_WIDTH * i;
+		for(uint32_t y = 0; y < ball_height; ++y) {
+			uint32_t *dst = row;
+			src = colId;
+			for(uint32_t x = 0; x < ball_width; ++x) {
+				if(*src) {
+					*dst = p2_bouncing_balls_palette[*src];
+				}
+				++dst;
+				++src;
+			}
+			row += state->shared->buffer_width;
+			colId += P2_BOUNCING_BALLS_WIDTH;
+		}
+
+		// spring
+		row = state->shared->buffer + first_ball_spring_x + distance_to_next * i;
+		row += spring_offset_y * state->shared->buffer_width;
+		colId = p2_bouncing_ball_springs_data;
+		colId += spring_anim_offset[ball_springs[i].offset] * spring_width;
+		for(uint32_t y = 0; y < P2_BOUNCING_BALL_SPRINGS_HEIGHT; ++y) {
+			uint32_t *dst = row;
+			src = colId;
+			for(uint32_t x = 0; x < spring_width; ++x) {
+				if(*src) {
+					*dst = p2_bouncing_ball_springs_palette[*src];
+				}
+				++dst;
+				++src;
+			}
+			row += state->shared->buffer_width;
+			colId += P2_BOUNCING_BALL_SPRINGS_WIDTH;
+		}
 	}
 
 }

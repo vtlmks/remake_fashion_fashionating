@@ -2,6 +2,7 @@
 	"files.associations": {
 		"fashion_sample.h": "c",
 		"random": "c",
-		"cstdlib": "c"
+		"cstdlib": "c",
+		"cstdint": "c"
 	}
 }

@@ -25,10 +25,11 @@ static uint32_t rgba_pack_4x8(struct v4 unpacked) {
 	return result;
 }
 
+#define blend(a, t, b) (((1.f - t) * a) + (t * b))
+
 #define p1_rotating_logo_steps 30
 #define p1_rotating_logo_frame_height (P1_ROTATING_LOGO_HEIGHT / p1_rotating_logo_steps)
 
-#define blend(a, t, b) (((1.f - t) * a) + (t * b))
 
 #define p1_c64CursorWidth 7
 #define p1_c64CursorHeight 8
@@ -146,21 +147,21 @@ static uint32_t p1_bling_star_phases[] = {
 };
 
 struct point {
-	uint32_t x, y;
+	int32_t x, y;
 };
 
 #define mo (368 - P1_ROTATING_LOGO_WIDTH)
 static struct point p1_bling_sprite_locations[] = {
-	{ 156-6-4, 103-6 },
-	{ 131-6-4,  79-6 },
-	{ 208-6-4,  79-6 },
-	{ 214-4-4,  55-6 },
-	{  92-6-4,  73-6 },
-	{ 258-4-4, 114-6 },
-	{ 278-3-4,  55-6 },
-	{ 258-4-4, 103-6 },
-	{ 189-6-4,  55-6 },
-	{  92-6-4, 113-6 },
+	{ 156-6, 103-6 },
+	{ 131-6,  79-6 },
+	{ 208-6,  79-6 },
+	{ 214-4,  55-6 },
+	{  92-6,  73-6 },
+	{ 258-4, 114-6 },
+	{ 278-3,  55-6 },
+	{ 258-4, 103-6 },
+	{ 189-6,  55-6 },
+	{  92-6, 113-6 },
 };
 
 typedef struct {
@@ -437,10 +438,8 @@ static void p1_scroller(struct remake_state *state) {
 		dest += state->shared->buffer_width;
 	}
 
-
 	count++;
 }
-
 
 static int32_t part_1_render(struct remake_state *state) {
 	static uint32_t decrunchTime = 256;
@@ -461,14 +460,12 @@ static int32_t part_1_render(struct remake_state *state) {
 		decrunchEffect(state);
 	}
 
-	if(p1_frame == 1080) {
-		// audio_set_current_stream(&background_audio_state, streams + demo_part_1_sample);
-		// background_audio_state.mute_sound = false;
+	if(p1_frame == 1100) {
+		state->p1_audio_state = 1;
 	}
 
 	if(p1_frame == 1950) {
-		// audio_set_current_stream(&background_audio_state, streams + demo_part_1);
-		// background_audio_state.mute_sound = false;
+		state->p1_audio_state = 2;
 	}
 
 	/*

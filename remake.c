@@ -85,6 +85,7 @@ struct remake_state {
 	struct pt_state p4_ivory_tower;
 	struct sample_state sample;
 	struct rng_state rand_state;
+	uint32_t p1_audio_state;
 	uint32_t demo_state;									// Which demopart we are in
 };
 
@@ -126,21 +127,29 @@ void audio_callback(struct remake_state *state, int16_t *audio_buffer, size_t fr
 
 		// TODO(peter): make this a statemachine for part 1, as the sample shouldn't begin playing until a certain time, and then the module should start at yet another later time.
 		case 1: {
-			if(state->sample.done) {
-				pt2play_FillAudioBuffer(&state->p1_fashionating, audio_buffer, frames);
-			} else {
-				int16_t *dst = audio_buffer;
-				for(uint32_t i = 0; i < frames; ++i) {
-					int16_t sample = state->sample.data[state->sample.position];
-					sample = (int16_t)(sample * 0.707);
-					*dst++ = sample;
-					*dst++ = sample;
-					state->sample.position++;
-					if(state->sample.position == state->sample.size) {
-						state->sample.done = true;
-						break;
+			switch(state->p1_audio_state) {
+				case 0: {
+					memset(audio_buffer, 0, frames*2*sizeof(int16_t));
+				} break;
+
+				case 1: {
+					int16_t *dst = audio_buffer;
+					for(uint32_t i = 0; i < frames; ++i) {
+						int16_t sample = state->sample.data[state->sample.position];
+						sample = (int16_t)(sample * 0.707);
+						*dst++ = sample;
+						*dst++ = sample;
+						state->sample.position++;
+						if(state->sample.position == state->sample.size) {
+							state->p1_audio_state = 0;
+							break;
+						}
 					}
-				}
+				} break;
+
+				case 2: {
+					pt2play_FillAudioBuffer(&state->p1_fashionating, audio_buffer, frames);
+				} break;
 			}
 		} break;
 
@@ -205,7 +214,9 @@ uint32_t mainloop_callback(struct remake_state *state) {
 		case 3: {
 			part_2_render(state);
 		} break;
-		case 5:
+		case 5: {
+			part_3_render(state);
+		} break;
 		case 7: {
 			part_4_render(state);
 
@@ -235,8 +246,8 @@ struct remake_info remake_information = {
 	.release_name = "Fashion - Fashionating (1988-05)",
 	.display_name = "Fashion - Fashionating",
 	.author_name = "ViTAL/Mindkiller Systems",
-	.buffer_width = 368,
-	.buffer_height = 276,
+	.buffer_width = 376,
+	.buffer_height = 287,
 	.frames_per_second = 50,
 	.setup = setup,
 	.cleanup = cleanup,

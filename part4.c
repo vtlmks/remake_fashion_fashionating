@@ -42,9 +42,9 @@ static uint32_t fsn_bottom_logo_colors[32] = {	// Green
 
 // Macro definitions for dimensions and offsets
 #define P4_LOGO_X_OFFSET                            55
-#define P4_TOP_LOGO_Y_OFFSET                        (22 - 11)
-#define P4_BOTTOM_LOGO_Y_OFFSET                     (231 - 11)
-#define P4_UPSCROLL_Y_POS                           (69 - 11)
+#define P4_TOP_LOGO_Y_OFFSET                        (22 - 6)
+#define P4_BOTTOM_LOGO_Y_OFFSET                     (231 - 6)
+#define P4_UPSCROLL_Y_POS                           (69 - 6)
 #define P4_UPSCROLL_WIDTH                           352
 #define P4_UPSCROLL_HEIGHT                          220
 #define P4_UPSCROLL_VISIBLE_HEIGHT                  157
