@@ -290,32 +290,22 @@ static void fast_blit_with_palette_sse4_1(struct loader_shared_state *state, con
 		uint32_t *row_dest = dest + y * state->buffer_width;
 
 		uint32_t x = 0;
-		for(; x <= image_width - 4; x += 4) {  // Process in blocks of 4
-			// Load 4 color IDs (8-bit values) at once
-			__m128i color_ids = _mm_loadl_epi64((const __m128i*)(row_src + x));
-			color_ids = _mm_unpacklo_epi8(color_ids, _mm_setzero_si128());  // Zero extend to 16-bit
-			color_ids = _mm_unpacklo_epi16(color_ids, _mm_setzero_si128());  // Zero extend to 32-bit
+		for(; x <= image_width - 4; x += 4) {													// Process in blocks of 4
+			__m128i color_ids = _mm_loadl_epi64((const __m128i*)(row_src + x));		// Load 4 color IDs (8-bit values) at once
+			color_ids = _mm_unpacklo_epi8(color_ids, _mm_setzero_si128());				// Zero extend to 16-bit
+			color_ids = _mm_unpacklo_epi16(color_ids, _mm_setzero_si128());			// Zero extend to 32-bit
 
-			// Manually gather palette colors
-			uint32_t idx0 = _mm_extract_epi32(color_ids, 0);
+			uint32_t idx0 = _mm_extract_epi32(color_ids, 0);								// Manually gather palette colors
 			uint32_t idx1 = _mm_extract_epi32(color_ids, 1);
 			uint32_t idx2 = _mm_extract_epi32(color_ids, 2);
 			uint32_t idx3 = _mm_extract_epi32(color_ids, 3);
-
 			__m128i new_colors = _mm_setr_epi32(palette[idx0], palette[idx1], palette[idx2], palette[idx3]);
 
-			// Create a mask where color_ids are not zero
-			__m128i mask = _mm_cmpeq_epi32(color_ids, _mm_setzero_si128());
-			mask = _mm_xor_si128(mask, _mm_set1_epi32(-1));  // Invert mask: now `1` where color_id != 0
-
-			// Load existing colors from the destination
-			__m128i old_colors = _mm_loadu_si128((__m128i*)(row_dest + x));
-
-			// Blend based on mask
-			__m128i blended_colors = _mm_blendv_epi8(old_colors, new_colors, mask);
-
-			// Store results
-			_mm_storeu_si128((__m128i*)(row_dest + x), blended_colors);
+			__m128i mask = _mm_cmpeq_epi32(color_ids, _mm_setzero_si128());			// Create a mask where color_ids are not zero
+			mask = _mm_xor_si128(mask, _mm_set1_epi32(-1));									// Invert mask: now `1` where color_id != 0
+			__m128i old_colors = _mm_loadu_si128((__m128i*)(row_dest + x));			// Load existing colors from the destination
+			__m128i blended_colors = _mm_blendv_epi8(old_colors, new_colors, mask);	// Blend based on mask
+			_mm_storeu_si128((__m128i*)(row_dest + x), blended_colors);					// Store results
 		}
 
 		// Handle remaining pixels
@@ -338,19 +328,21 @@ static void fast_blit_with_palette_avx(struct loader_shared_state *state, const 
 		uint32_t *row_dest = dest + y * buffer_width;
 		const uint8_t *row_src = image_data + y * image_width;
 
-		for(uint32_t x = 0; x < image_width; x += 8) {
-			// Load 8 pixels, these are 8 palette indices.
-			__m128i index_pack = _mm_loadl_epi64((__m128i*)(row_src + x)); // Load 8 bytes (palette indices)
-
-			// Since we cannot use gather in AVX1, manually process indices
-			uint32_t colors[8];
+		uint32_t x = 0;
+		for(; x < image_width; x += 8) {
+			__m128i index_pack = _mm_loadl_epi64((__m128i*)(row_src + x));										 // Load 8 bytes (palette indices)
+			uint32_t colors[8];																								// Since we cannot use gather in AVX1, manually process indices
 			for(int i = 0; i < 8; ++i) {
 				uint8_t idx = ((uint8_t*)&index_pack)[i];
 				colors[i] = palette[idx];
 			}
-
-			// Store results using a single 256-bit store
-			_mm256_storeu_si256((__m256i*)(row_dest + x), _mm256_loadu_si256((__m256i*)&colors[0]));
+			_mm256_storeu_si256((__m256i*)(row_dest + x), _mm256_loadu_si256((__m256i*)&colors[0]));	// Store results using a single 256-bit store
+		}
+		for(; x < image_width; ++x) {																	// Handle remaining pixels
+			uint32_t color_id = row_src[x];
+			if(color_id) {
+				row_dest[x] = palette[color_id];
+			}
 		}
 	}
 }
@@ -365,68 +357,25 @@ static void fast_blit_with_palette_avx2(struct loader_shared_state *state, const
 		uint32_t *row_dest = dest + y * state->buffer_width;
 
 		uint32_t x = 0;
-		for(; x <= image_width - 8; x += 8) {  // Process in blocks of 8
+		for(; x <= image_width - 8; x += 8) {														// Process in blocks of 8
 			__m128i color_ids_low = _mm_loadl_epi64((const __m128i*)(row_src + x));
-			__m256i color_ids = _mm256_cvtepu8_epi32(color_ids_low); // Zero extend to 32-bit
+			__m256i color_ids = _mm256_cvtepu8_epi32(color_ids_low);							// Zero extend to 32-bit
 			__m256i colors = _mm256_i32gather_epi32((const int*)palette, color_ids, 4);
 			__m256i mask = _mm256_cmpeq_epi32(color_ids, _mm256_setzero_si256());
-			mask = _mm256_xor_si256(mask, _mm256_set1_epi32(-1)); // Invert mask: `1` where color_id != 0
+			mask = _mm256_xor_si256(mask, _mm256_set1_epi32(-1));								// Invert mask: `1` where color_id != 0
 			__m256i old_colors = _mm256_loadu_si256((__m256i*)(row_dest + x));
 			__m256i blended_colors = _mm256_blendv_epi8(old_colors, colors, mask);
 			_mm256_storeu_si256((__m256i*)(row_dest + x), blended_colors);
 		}
 
-		// Handle remaining pixels
-		for(; x < image_width; ++x) {
+		for(; x < image_width; ++x) {																	// Handle remaining pixels
 			uint32_t color_id = row_src[x];
-			if(color_id != 0) {
+			if(color_id) {
 				row_dest[x] = palette[color_id];
 			}
 		}
 	}
 }
-
-
-#if 0
-__attribute__((target("avx2")))
-static void fast_blit_with_palette_avx2(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset) {
-    uint32_t *dest = state->buffer + y_offset * state->buffer_width + x_offset;
-    uint32_t buffer_width = state->buffer_width;
-
-    for(uint32_t y = 0; y < image_height; ++y) {
-        uint32_t *row_dest = dest + y * buffer_width;
-        const uint8_t *row_src = image_data + y * image_width;
-
-        for(uint32_t x = 0; x < image_width; x += 8) {
-            __m256i color_ids = _mm256_cvtepu8_epi32(_mm_loadu_si64((__m128i*)(row_src + x)));
-            __m256i colors = _mm256_i32gather_epi32((const int*)palette, color_ids, 4);
-            _mm256_storeu_si256((__m256i*)(row_dest + x), colors);
-        }
-    }
-}
-#endif
-
-// __attribute__((target("avx2")))
-// static void fast_blit_with_palette_avx2(struct loader_shared_state *state, const uint8_t *image_data, uint32_t image_width, uint32_t image_height, const uint32_t *palette, uint32_t x_offset, uint32_t y_offset) {
-// 	uint32_t *dest = state->buffer + y_offset * state->buffer_width + x_offset;
-// 	int num_pixels = image_width * image_height;
-// 	int i = 0;
-
-// 	// Process pixels in groups of 8
-// 	for (; i < num_pixels - 7; i += 8) {
-// 		// __m256i idx = _mm256_loadu_si256((__m256i*)(image_data + i));
-// 		__m256i idx = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)(image_data + i)));
-
-// 		__m256i colors = _mm256_i32gather_epi32((const int*)palette, idx, 4);
-// 		_mm256_storeu_si256((__m256i*)(dest + i), colors);
-// 	}
-
-// 	// Process remaining pixels that don't fit into a full AVX register
-// 	for (; i < num_pixels; ++i) {
-// 		dest[i] = palette[image_data[i]];
-// 	}
-// }
-
 
 static void render_and_clip_image_default(struct loader_shared_state *state, uint8_t *image_data, int image_width, int image_height, uint32_t *palette, int xOffset, int yOffset) {
 	int startX = xOffset < 0 ? -xOffset : 0;
