@@ -172,7 +172,7 @@ void audio_callback(struct remake_state *state, int16_t *audio_buffer, size_t fr
 }
 
 
-void key_callback(struct remake_state *state, int key) {
+void key_callback(struct remake_state *state, int key, int action) {
 	if(state->shared->keyboard_state[REMAKE_KEY_1]) {
 		state->demo_state = 1;
 	}
